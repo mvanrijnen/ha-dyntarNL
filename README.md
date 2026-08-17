@@ -202,6 +202,16 @@ pytest
 De tests draaien zonder HA-installatie (Home Assistant wordt gestubd) en gebruiken vastgelegde
 JSON-fixtures — geen live API-calls.
 
+## Tools: prijzen naar CSV (PowerShell)
+
+Los van Home Assistant kun je met [`tools/Get-DynTarPrices.ps1`](tools/Get-DynTarPrices.ps1)
+de huidige + komende uurprijs (stroom & gas, beurs/all-in/opslag) van alle platforms ophalen
+en naar CSV wegschrijven (Excel-klaar, `;`-gescheiden, NL-notatie):
+
+```powershell
+.\tools\Get-DynTarPrices.ps1 -Path prijzen.csv
+```
+
 ## Licentie
 
 [MIT](LICENSE) © Maurits van Rijnen
