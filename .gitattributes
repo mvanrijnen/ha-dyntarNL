@@ -1,0 +1,6 @@
+# Normaliseer regeleindes: LF in de repository voor alle tekstbestanden.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary

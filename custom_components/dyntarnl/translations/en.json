@@ -1,0 +1,27 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "DynTarNL — choose your supplier",
+        "description": "Choose your energy supplier. The integration figures out which platform and price API to use. Supplier not listed? Choose 'Custom supplier (manual)'.",
+        "data": {
+          "supplier": "Supplier"
+        }
+      },
+      "custom": {
+        "title": "Custom supplier",
+        "description": "Useful for suppliers without a public API, such as Vattenfall, Eneco, Tibber, Greenchoice, Zonneplan, ENGIE, DELTA, Vandebron, OXXIO and others.\n\nThe integration fetches the bare EPEX market price and computes the all-in price itself. Enter your tariffs excluding VAT; VAT is applied on top.\n\nall-in = (EPEX + markup + energy tax) × (1 + VAT%)",
+        "data": {
+          "vat_percentage": "VAT (%)",
+          "markup_electricity": "Markup electricity (€/kWh, excl. VAT)",
+          "markup_gas": "Markup gas (€/m³, excl. VAT)",
+          "energy_tax_electricity": "Energy tax electricity (€/kWh, excl. VAT)",
+          "energy_tax_gas": "Energy tax gas (€/m³, excl. VAT)"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This supplier is already configured."
+    }
+  }
+}
