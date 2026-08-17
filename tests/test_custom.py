@@ -55,3 +55,39 @@ def test_custom_zero_markup_equals_epex_plus_tax(monkeypatch, load_fixture, now)
     cur = slot_at(data["electricity"].today, now)
     assert cur.fee == 0.0
     assert abs(cur.total - (cur.market_ex + 0.10) * 1.21) < 1e-6
+
+
+def test_custom_empty_config_defaults_to_zero(monkeypatch, load_fixture, now):
+    """Lege config: geen opslag/belasting/btw ingevuld -> alles 0, standaard-btw 21%."""
+    elec = load_fixture("easyenergy_electricity.json")
+    gas = load_fixture("easyenergy_gas.json")
+
+    async def fake_get(session, url, **kw):
+        return elec if kw["params"]["type"] == "electricity" else gas
+
+    monkeypatch.setattr(src, "_get_json", fake_get)
+
+    data = asyncio.run(src.build_custom(None, {}))
+    cur = slot_at(data["electricity"].today, now)
+    assert cur.fee == 0.0
+    assert cur.tax == 0.0
+    # zonder opslag/belasting is all-in gelijk aan de beurs (EPEX incl. btw)
+    assert abs(cur.total - cur.market) < 1e-6
+    assert abs(cur.market - cur.market_ex * 1.21) < 1e-6
+
+
+def test_custom_partial_config(monkeypatch, load_fixture, now):
+    """Alleen opslag ingevuld, geen belasting -> belasting defaultt naar 0."""
+    elec = load_fixture("easyenergy_electricity.json")
+    gas = load_fixture("easyenergy_gas.json")
+
+    async def fake_get(session, url, **kw):
+        return elec if kw["params"]["type"] == "electricity" else gas
+
+    monkeypatch.setattr(src, "_get_json", fake_get)
+
+    data = asyncio.run(src.build_custom(None, {"markup_electricity": 0.03}))
+    cur = slot_at(data["electricity"].today, now)
+    assert round(cur.fee, 5) == round(0.03 * 1.21, 5)
+    assert cur.tax == 0.0
+    assert abs(cur.total - (cur.market_ex + 0.03) * 1.21) < 1e-6

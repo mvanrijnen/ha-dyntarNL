@@ -53,6 +53,18 @@ beurs  = EPEX × (1 + btw%)
 
 ## Installatie (HACS)
 
+**Snel — via de knop** (vereist dat HACS al geïnstalleerd is):
+
+[![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mvanrijnen&repository=ha-dyntarNL&category=integration)
+
+Klik de knop → HACS opent op jouw Home Assistant met deze repo al ingevuld → **Download** en
+herstart Home Assistant. Voeg daarna de integratie toe met de knop hieronder (of via
+**Instellingen → Apparaten & Services → Integratie toevoegen** → *DynTarNL*):
+
+[![Add integration](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=dyntarnl)
+
+**Handmatig:**
+
 1. HACS → ⋮ → **Custom repositories** → `https://github.com/mvanrijnen/ha-dyntarNL`, categorie **Integration**.
 2. Installeer **DynTarNL** en herstart Home Assistant.
 3. **Instellingen → Apparaten & Services → Integratie toevoegen** → zoek *DynTarNL* → kies je leverancier.
