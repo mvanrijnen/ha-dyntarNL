@@ -50,8 +50,23 @@ def _fill_market_from_epex(data: PriceData, epex: EpexMap) -> None:
                     s.market = round(market_ex * (1 + ed.vat_percentage / 100), 6)
 
 
+def _needs_epex_fallback(data: PriceData) -> bool:
+    """True als een bron geen eigen beursprijs levert (dan pas EPEX ophalen)."""
+    for ed in data.values():
+        for slots in (ed.today, ed.tomorrow, ed.yesterday):
+            for s in slots or []:
+                if not s.market_ex:
+                    return True
+    return False
+
+
 class DynTarNLCoordinator(DataUpdateCoordinator[PriceData]):
-    """Haalt de tarieven van de gekozen leverancier op, plus altijd de EPEX."""
+    """Haalt de tarieven van de gekozen leverancier op.
+
+    Het ophalen wordt door __init__.py aangestuurd (opstart, na middernacht en in de
+    middag); het interval staat daarom op None. De EPEX-beursprijs wordt alleen als
+    fallback opgehaald wanneer de gekozen bron zelf geen beursprijs levert.
+    """
 
     config_entry: DynTarNLConfigEntry
 
@@ -61,7 +76,7 @@ class DynTarNLCoordinator(DataUpdateCoordinator[PriceData]):
             LOGGER,
             config_entry=entry,
             name=DOMAIN,
-            update_interval=timedelta(hours=1),
+            update_interval=None,
         )
         self._session = async_get_clientsession(hass)
         self.supplier = supplier_by_key(entry.data.get(CONF_SUPPLIER, ""))
@@ -72,9 +87,6 @@ class DynTarNLCoordinator(DataUpdateCoordinator[PriceData]):
             raise UpdateFailed("Onbekende leverancier geconfigureerd")
 
         try:
-            # EPEX wordt ALTIJD opgehaald (basis + fallback voor drempels/beurs).
-            epex = await fetch_epex(self._session)
-
             if supplier.platform == PLATFORM_EON_APP:
                 data = await fetch_eon_app(self._session, supplier.host or "")
             elif supplier.platform == PLATFORM_EASYENERGY:
@@ -90,10 +102,14 @@ class DynTarNLCoordinator(DataUpdateCoordinator[PriceData]):
                 raise UpdateFailed(
                     f"Platform '{supplier.platform}' is nog niet geïmplementeerd"
                 )
+
+            # EPEX alleen ophalen als de bron zelf geen beursprijs bevat.
+            if _needs_epex_fallback(data):
+                epex = await fetch_epex(self._session)
+                _fill_market_from_epex(data, epex)
         except (aiohttp.ClientError, TimeoutError) as err:
             raise UpdateFailed(f"Fout bij ophalen tarieven: {err}") from err
 
-        _fill_market_from_epex(data, epex)
         if not data:
             raise UpdateFailed("Geen tarieven ontvangen")
         return data

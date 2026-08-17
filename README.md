@@ -19,23 +19,26 @@ voor de ondersteunde leveranciers.
 
 ## Ondersteunde leveranciers
 
-Je kiest je merk in de config-flow; het **platform** wordt automatisch bepaald.
+Je kiest je merk in de config-flow; het **platform** wordt automatisch bepaald. **Elke
+ondersteunde leverancier levert zowel een beurs- als een all-in prijs** — je hoeft niets
+in te vullen. **Alleen bij CUSTOM** vul je zelf je tarieven in.
 
-| Leverancier | Platform | Detail |
-| --- | --- | --- |
-| Essent, Energiedirect | eon-app | volledige breakdown (beurs + opslag + belasting) |
-| Frank Energie | frank | volledige breakdown |
-| EnergyZero, ANWB Energie, Coolblue Energie, Energie VanOns, GroeneStroomLokaal, SamSam, Hegg Energy | energyzero | marktprijs + NL-belasting (geen opslag) |
-| Nieuwestroom, EasyEnergie | easyenergy | EPEX + belasting |
-| **Eigen leverancier (handmatig)** | custom | EPEX + je eigen btw/opslag/belasting |
+| Leverancier | Platform | Beurs | All-in | Opslag |
+| --- | --- | :--: | :--: | --- |
+| Essent, Energiedirect | eon-app | ✅ | ✅ | van leverancier |
+| Frank Energie | frank | ✅ | ✅ | van leverancier |
+| EnergyZero, ANWB Energie, Coolblue Energie, Energie VanOns, GroeneStroomLokaal, SamSam, Hegg Energy | energyzero | ✅ | ✅ | geen (0) |
+| Nieuwestroom, EasyEnergie | easyenergy | ✅ | ✅ | geen (0) |
+| **Eigen leverancier (handmatig)** | custom | ✅ | ✅ | **jij vult in** |
+
+- **Volledige breakdown** (beurs + opslag + belasting): Essent, Energiedirect, Frank.
+- **Beurs + belasting, geen leverancier-opslag** (all-in is een benadering; opslag = 0):
+  EnergyZero-merken en easyEnergy. Wil je het exact? Gebruik **CUSTOM**.
 
 **Staat je leverancier er niet bij?** Kies **CUSTOM**. De EPEX-beursprijs is voor iedereen
 gelijk; je vult éénmalig je opslag + energiebelasting (excl. btw) + btw in, en de integratie
 rekent je all-in prijs exact uit. Zo werken ook login-only leveranciers zoals **Vattenfall,
 Eneco, Tibber, Greenchoice, Zonneplan, ENGIE, DELTA, Vandebron, OXXIO** e.a.
-
-De integratie haalt **altijd** de kale EPEX-beursprijs op als basis/fallback, zodat de
-beurs-waarde en de teruglever-drempels bij élke leverancier werken.
 
 ## Entiteiten
 
@@ -140,22 +143,34 @@ Je kiest alleen je **merk**; de integratie regelt de rest zelf:
      wordt de energiebelasting via de NL-standaard aangevuld en is de opslag `0`. Wil je die
      leveranciers exact? Gebruik **CUSTOM** en vul je opslag zelf in.
 
-3. **EPEX wordt altijd opgehaald.** Ongeacht je leverancier haalt de integratie áltijd de kale
-   EPEX-beursprijs op als basis en **fallback**. Zo werken de `beurs`-sensoren en de
-   negatieve-prijs/teruglever-triggers bij **élke** leverancier — ook als de leverancier zelf
-   geen uitsplitsing geeft.
+3. **Alleen bij CUSTOM vul je zelf gegevens in.** Bij alle andere leveranciers komt alles
+   automatisch uit de publieke API — je hoeft niets in te vullen. Elke ondersteunde bron
+   levert zowel een **beurs**- als een **all-in**-prijs; alleen ontbreekt bij EnergyZero/
+   easyEnergy de leverancier-opslag (die wordt dan als 0 gerekend).
 
-4. **CUSTOM: zelf de tarieven, EPEX uit de lucht.** Kies je "Eigen leverancier", dan reken je
-   je all-in prijs op basis van de opgehaalde EPEX + je eigen (excl. btw) opslag en
-   energiebelasting; de btw wordt er automatisch overheen gerekend:
+4. **EPEX alleen indien nodig.** Omdat elke bron zelf al een beursprijs meelevert, wordt de
+   kale EPEX **niet** apart opgehaald. Alleen als een bron ooit wél een all-in maar géén
+   beurs zou geven, haalt de integratie EPEX op als vangnet om de beurs af te leiden.
+
+5. **CUSTOM: zelf de tarieven.** Kies je "Eigen leverancier", dan reken je je all-in prijs op
+   basis van de EPEX + je eigen (excl. btw) opslag en energiebelasting; de btw wordt er
+   automatisch overheen gerekend:
 
 ```
 all-in = (EPEX + opslag + energiebelasting) × (1 + btw%)     (alle invoer excl. btw)
 beurs  = EPEX × (1 + btw%)
 ```
 
-De prijzen van morgen komen 's middags binnen (day-ahead). De integratie ververst bij
-opstarten, elk heel uur, en met extra pogingen tussen 13:00–16:00 tot morgen beschikbaar is.
+## Verversen
+
+De prijs-*array* verandert maar een paar keer per dag, dus de integratie is zuinig met de API:
+
+- **Data ophalen:** bij opstarten, kort na middernacht (nieuwe dag), en 's middags
+  (13:30/14:30/15:30/16:30) tot de prijzen van morgen binnen zijn.
+- **Elk heel uur:** de sensoren rollen mee (huidige prijs, en om 06:00 de gasprijs) — **zonder**
+  netwerk-call, puur uit de cache.
+- **Handmatig:** elke leverancier heeft een knop **"Ververs tarieven"** (op de device-pagina,
+  onder Configuratie). Die kun je ook vanuit automatiseringen aanroepen via `button.press`.
 
 ## Installatie (HACS)
 

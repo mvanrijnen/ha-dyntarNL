@@ -39,7 +39,12 @@ def _install_ha_stubs() -> None:
     const = _mod("homeassistant.const")
     const.CURRENCY_EURO = "€"
     const.UnitOfTime = type("UnitOfTime", (), {"HOURS": "h"})
-    const.Platform = type("Platform", (), {"SENSOR": "sensor", "BINARY_SENSOR": "binary_sensor"})
+    const.Platform = type(
+        "Platform",
+        (),
+        {"SENSOR": "sensor", "BINARY_SENSOR": "binary_sensor", "BUTTON": "button"},
+    )
+    const.EntityCategory = type("EntityCategory", (), {"CONFIG": "config", "DIAGNOSTIC": "diagnostic"})
 
     core = _mod("homeassistant.core")
     core.HomeAssistant = object
