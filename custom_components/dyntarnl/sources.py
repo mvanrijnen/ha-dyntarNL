@@ -9,11 +9,13 @@ import aiohttp
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    CONF_EPEX_SOURCE,
     CONF_MARKUP_ELEC,
     CONF_MARKUP_GAS,
     CONF_TAX_ELEC,
     CONF_TAX_GAS,
     CONF_VAT,
+    DEFAULT_EPEX_SOURCE,
     DEFAULT_TAX_ELEC,
     DEFAULT_TAX_GAS,
     DEFAULT_VAT,
@@ -167,40 +169,64 @@ async def fetch_epex(session: aiohttp.ClientSession) -> EpexMap:
 # --- CUSTOM: EPEX + zelf ingevulde opslag/belasting/btw ---------------------
 
 
+async def _epex_source(session: aiohttp.ClientSession, source: str) -> PriceData:
+    """Haal de beursprijs-slots op bij de gekozen bron (elk platform levert een beurs)."""
+    if source == "energyzero":
+        return await fetch_energyzero(session)
+    if source == "frank":
+        return await fetch_frank(session)
+    if source == "essent":
+        return await fetch_eon_app(session, "www.essent.nl")
+    return await fetch_easyenergy(session)  # default: easyEnergy
+
+
 async def build_custom(session: aiohttp.ClientSession, cfg: dict) -> PriceData:
     """Reken all-in uit de kale EPEX + door de gebruiker ingevulde (excl. btw) waarden.
 
     all-in = (EPEX + opslag + energiebelasting) × (1 + btw%);  beurs = EPEX incl. btw.
+    De kale EPEX komt van de gekozen bron (`epex_source`, default easyEnergy). Alleen de
+    beursprijs van die bron wordt gebruikt; de opslag/belasting komen van de gebruiker.
     """
     vat = float(cfg.get(CONF_VAT, DEFAULT_VAT))
     factor = 1 + vat / 100
+    base = await _epex_source(session, cfg.get(CONF_EPEX_SOURCE, DEFAULT_EPEX_SOURCE))
     params = {
-        ELECTRICITY: (float(cfg.get(CONF_MARKUP_ELEC, 0.0)), float(cfg.get(CONF_TAX_ELEC, 0.0)), "kWh", "hour"),
-        GAS: (float(cfg.get(CONF_MARKUP_GAS, 0.0)), float(cfg.get(CONF_TAX_GAS, 0.0)), "m³", "day"),
+        ELECTRICITY: (float(cfg.get(CONF_MARKUP_ELEC, 0.0)), float(cfg.get(CONF_TAX_ELEC, 0.0)), "kWh"),
+        GAS: (float(cfg.get(CONF_MARKUP_GAS, 0.0)), float(cfg.get(CONF_TAX_GAS, 0.0)), "m³"),
     }
+
+    def to_custom(s: Slot, markup_ex: float, tax_ex: float) -> Slot:
+        subtotal_ex = s.market_ex + markup_ex + tax_ex
+        total = subtotal_ex * factor
+        return Slot(
+            start=s.start,
+            end=s.end,
+            total=round(total, 6),
+            market=round(s.market_ex * factor, 6),
+            market_ex=s.market_ex,
+            fee=round(markup_ex * factor, 6),
+            fee_ex=markup_ex,
+            tax=round(tax_ex * factor, 6),
+            tax_ex=tax_ex,
+            vat=round(total - subtotal_ex, 6),
+        )
+
     result: PriceData = {}
-    for energy, (markup_ex, tax_ex, unit, gran) in params.items():
-        slots: list[Slot] = []
-        for r in await _easyenergy_rows(session, energy, gran):
-            market_ex = float(r["price"])
-            subtotal_ex = market_ex + markup_ex + tax_ex
-            total = subtotal_ex * factor
-            slots.append(
-                Slot(
-                    start=parse_dt(_clean_ts(r["from"])),
-                    end=parse_dt(_clean_ts(r["until"])),
-                    total=round(total, 6),
-                    market=round(market_ex * factor, 6),
-                    market_ex=market_ex,
-                    fee=round(markup_ex * factor, 6),
-                    fee_ex=markup_ex,
-                    tax=round(tax_ex * factor, 6),
-                    tax_ex=tax_ex,
-                    vat=round(total - subtotal_ex, 6),
-                )
-            )
-        if slots:
-            result[energy] = bucket_by_day(slots, unit, vat)
+    for energy, (markup_ex, tax_ex, unit) in params.items():
+        ed = base.get(energy)
+        if not ed:
+            continue
+
+        def mapped(slots):
+            return [to_custom(s, markup_ex, tax_ex) for s in slots] if slots else None
+
+        result[energy] = EnergyData(
+            unit=unit,
+            vat_percentage=vat,
+            today=mapped(ed.today) or [],
+            tomorrow=mapped(ed.tomorrow),
+            yesterday=mapped(ed.yesterday),
+        )
     return result
 
 

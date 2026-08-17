@@ -18,16 +18,19 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import (
+    CONF_EPEX_SOURCE,
     CONF_MARKUP_ELEC,
     CONF_MARKUP_GAS,
     CONF_SUPPLIER,
     CONF_TAX_ELEC,
     CONF_TAX_GAS,
     CONF_VAT,
+    DEFAULT_EPEX_SOURCE,
     DEFAULT_TAX_ELEC,
     DEFAULT_TAX_GAS,
     DEFAULT_VAT,
     DOMAIN,
+    EPEX_SOURCES,
     PLATFORM_CUSTOM,
     SUPPLIERS,
     supplier_by_key,
@@ -101,6 +104,13 @@ class DynTarNLConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_MARKUP_GAS, default=0.0): _euro(2),
                 vol.Required(CONF_TAX_ELEC, default=DEFAULT_TAX_ELEC): _euro(1),
                 vol.Required(CONF_TAX_GAS, default=DEFAULT_TAX_GAS): _euro(2),
+                vol.Required(CONF_EPEX_SOURCE, default=DEFAULT_EPEX_SOURCE): SelectSelector(
+                    SelectSelectorConfig(
+                        options=list(EPEX_SOURCES),
+                        translation_key="epex_source",
+                        mode=SelectSelectorMode.DROPDOWN,
+                    )
+                ),
             }
         )
         return self.async_show_form(step_id="custom", data_schema=schema)

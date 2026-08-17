@@ -16,12 +16,26 @@
           "markup_electricity": "Opslag stroom (€/kWh, excl. btw)",
           "markup_gas": "Opslag gas (€/m³, excl. btw)",
           "energy_tax_electricity": "Energiebelasting stroom (€/kWh, excl. btw)",
-          "energy_tax_gas": "Energiebelasting gas (€/m³, excl. btw)"
+          "energy_tax_gas": "Energiebelasting gas (€/m³, excl. btw)",
+          "epex_source": "Bron voor de EPEX-beursprijs"
+        },
+        "data_description": {
+          "epex_source": "Waar de kale beursprijs vandaan komt. Voor stroom is die overal gelijk; voor gas verschilt 'ie licht per bron. Twijfel je? Laat easyEnergy staan."
         }
       }
     },
     "abort": {
       "already_configured": "Deze leverancier is al geconfigureerd."
+    }
+  },
+  "selector": {
+    "epex_source": {
+      "options": {
+        "easyenergy": "easyEnergy (standaard)",
+        "energyzero": "EnergyZero",
+        "frank": "Frank Energie",
+        "essent": "Essent"
+      }
     }
   }
 }

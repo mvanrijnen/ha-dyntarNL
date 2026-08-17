@@ -16,12 +16,26 @@
           "markup_electricity": "Markup electricity (€/kWh, excl. VAT)",
           "markup_gas": "Markup gas (€/m³, excl. VAT)",
           "energy_tax_electricity": "Energy tax electricity (€/kWh, excl. VAT)",
-          "energy_tax_gas": "Energy tax gas (€/m³, excl. VAT)"
+          "energy_tax_gas": "Energy tax gas (€/m³, excl. VAT)",
+          "epex_source": "EPEX market-price source"
+        },
+        "data_description": {
+          "epex_source": "Where the bare market price comes from. For electricity it is identical everywhere; for gas it differs slightly per source. Unsure? Leave easyEnergy."
         }
       }
     },
     "abort": {
       "already_configured": "This supplier is already configured."
+    }
+  },
+  "selector": {
+    "epex_source": {
+      "options": {
+        "easyenergy": "easyEnergy (default)",
+        "energyzero": "EnergyZero",
+        "frank": "Frank Energie",
+        "essent": "Essent"
+      }
     }
   }
 }

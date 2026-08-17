@@ -67,6 +67,12 @@ DEFAULT_VAT = 21.0
 DEFAULT_TAX_ELEC = 0.09161
 DEFAULT_TAX_GAS = 0.60066
 
+# CUSTOM: bron voor de kale EPEX-beursprijs. Elk platform levert een beursprijs;
+# voor stroom is die identiek, voor gas verschilt 'ie licht per bron.
+CONF_EPEX_SOURCE = "epex_source"
+EPEX_SOURCES = ("easyenergy", "energyzero", "frank", "essent")
+DEFAULT_EPEX_SOURCE = "easyenergy"
+
 # --- eon-app group-types ----------------------------------------------------
 GROUP_MARKET = "MARKET_PRICE"
 GROUP_FEE = "PURCHASING_FEE"

@@ -160,6 +160,10 @@ all-in = (EPEX + opslag + energiebelasting) × (1 + btw%)     (alle invoer excl.
 beurs  = EPEX × (1 + btw%)
 ```
 
+Bij CUSTOM kies je ook **waar de kale EPEX vandaan komt** (easyEnergy, EnergyZero, Frank of
+Essent). Voor **stroom** is de beurs bij elke bron gelijk; voor **gas** verschilt 'ie licht per
+bron. Standaard staat 'ie op easyEnergy — laat dat gerust staan als je twijfelt.
+
 ## Verversen
 
 De prijs-*array* verandert maar een paar keer per dag, dus de integratie is zuinig met de API:

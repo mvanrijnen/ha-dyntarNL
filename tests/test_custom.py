@@ -57,6 +57,43 @@ def test_custom_zero_markup_equals_epex_plus_tax(monkeypatch, load_fixture, now)
     assert abs(cur.total - (cur.market_ex + 0.10) * 1.21) < 1e-6
 
 
+def test_custom_epex_source_essent(monkeypatch, load_fixture, now):
+    """EPEX-bron = Essent (eon-app): beurs komt uit de eon-app data."""
+    essent = load_fixture("essent.json")
+
+    async def fake_get(session, url, **kw):
+        return essent  # dynamic-prices endpoint
+
+    monkeypatch.setattr(src, "_get_json", fake_get)
+
+    cfg = {"epex_source": "essent", "markup_electricity": 0.02, "energy_tax_electricity": 0.09161}
+    data = asyncio.run(src.build_custom(None, cfg))
+    cur = slot_at(data["electricity"].today, now)
+    assert cur is not None
+    assert abs(cur.market - cur.market_ex * 1.21) < 1e-6
+    assert abs(cur.total - (cur.market_ex + 0.02 + 0.09161) * 1.21) < 1e-6
+
+
+def test_custom_epex_source_frank(monkeypatch, load_fixture, now):
+    """EPEX-bron = Frank (GraphQL): beurs komt uit marketPrice."""
+    import re
+
+    payload = load_fixture("frank_today.json")
+    today = now.strftime("%Y-%m-%d")
+
+    async def fake_post(session, url, body):
+        m = re.search(r'startDate:"(\d{4}-\d\d-\d\d)"', body["query"])
+        return payload if m and m.group(1) == today else {"data": {}}
+
+    monkeypatch.setattr(src, "_post_json", fake_post)
+
+    cfg = {"epex_source": "frank", "markup_gas": 0.08, "energy_tax_gas": 0.60066}
+    data = asyncio.run(src.build_custom(None, cfg))
+    cur = slot_at(data["electricity"].today, now)
+    assert cur is not None
+    assert abs(cur.market - cur.market_ex * 1.21) < 1e-6
+
+
 def test_custom_empty_config_defaults_to_zero(monkeypatch, load_fixture, now):
     """Lege config: geen opslag/belasting/btw ingevuld -> alles 0, standaard-btw 21%."""
     elec = load_fixture("easyenergy_electricity.json")
