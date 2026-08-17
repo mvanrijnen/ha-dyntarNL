@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="brand/logo.svg" alt="DynTarNL" width="380">
+</p>
+
 # DynTarNL — Dynamische stroom- & gastarieven (NL)
 
 [![Tests](https://github.com/mvanrijnen/ha-dyntarNL/actions/workflows/test.yml/badge.svg)](https://github.com/mvanrijnen/ha-dyntarNL/actions/workflows/test.yml)
