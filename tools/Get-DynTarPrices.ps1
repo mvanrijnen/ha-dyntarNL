@@ -73,7 +73,8 @@ function Get-Frank {
         foreach ($pair in @(@("electricity", $data.marketPricesElectricity), @("gas", $data.marketPricesGas))) {
             foreach ($r in $pair[1]) {
                 $mex = [double]$r.marketPrice; $market = $mex + [double]$r.marketPriceTax
-                $fee = [double]$r.sourcingMarkupPrice * $VAT; $tax = [double]$r.energyTaxPrice
+                # sourcingMarkupPrice en energyTaxPrice zijn AL incl. btw.
+                $fee = [double]$r.sourcingMarkupPrice; $tax = [double]$r.energyTaxPrice
                 $res[$pair[0]] += New-Slot (To-Local $r.from) (To-Local $r.till) `
                     ([math]::Round($market,5)) ([math]::Round($market + $fee + $tax,5)) ([math]::Round($fee,5))
             }

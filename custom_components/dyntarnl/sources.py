@@ -228,9 +228,11 @@ async def fetch_frank(session: aiohttp.ClientSession) -> PriceData:
         for r in rows_per_energy[energy]:
             market_ex = float(r["marketPrice"])
             market = round(market_ex + float(r.get("marketPriceTax") or 0.0), 6)
-            fee_ex = float(r.get("sourcingMarkupPrice") or 0.0)
             factor = market / market_ex if market_ex else 1.21
-            fee = round(fee_ex * factor, 6)
+            # sourcingMarkupPrice (opslag) is AL incl. btw — net als energyTaxPrice;
+            # alleen marketPrice heeft een aparte btw-regel (marketPriceTax).
+            fee = float(r.get("sourcingMarkupPrice") or 0.0)
+            fee_ex = round(fee / factor, 6) if factor else fee
             tax = float(r.get("energyTaxPrice") or 0.0)  # incl. btw
             tax_ex = round(tax / factor, 6) if factor else tax
             total = round(market + fee + tax, 6)

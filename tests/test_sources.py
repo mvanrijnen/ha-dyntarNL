@@ -83,3 +83,20 @@ def test_frank_parser(monkeypatch, load_fixture, now):
     assert cur is not None
     assert abs(cur.total - (cur.market + cur.fee + cur.tax)) < 1e-4
     assert cur.market_ex > 0 and cur.fee_ex > 0
+
+    # De all-in moet exact de som van Frank's ruwe velden zijn: sourcingMarkupPrice
+    # en energyTaxPrice zijn AL incl. btw (geen extra btw eroverheen rekenen).
+    raw = next(
+        r
+        for r in payload["data"]["marketPricesElectricity"]
+        if src.parse_dt(r["from"]).hour == now.hour
+        and src.parse_dt(r["from"]).date() == now.date()
+    )
+    expected = (
+        float(raw["marketPrice"])
+        + float(raw["marketPriceTax"])
+        + float(raw["sourcingMarkupPrice"])
+        + float(raw["energyTaxPrice"])
+    )
+    assert abs(cur.total - expected) < 1e-5
+    assert abs(cur.fee - float(raw["sourcingMarkupPrice"])) < 1e-9
