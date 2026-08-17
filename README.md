@@ -9,7 +9,13 @@ leveranciers** als sensoren publiceert. Je kiest je leverancier; de integratie b
 welk platform en welke publieke prijs-API erbij hoort. **Geen account of API-sleutel nodig**
 voor de ondersteunde leveranciers.
 
-> ⚠️ In ontwikkeling (v0.0.1). Onofficieel; geen affiliatie met de leveranciers.
+> ## 🧪 Experimenteel — v0.0.1
+>
+> Deze integratie is **nog experimenteel en volop in ontwikkeling**. Dingen kunnen wijzigen
+> of (tijdelijk) stuk zijn, en niet elke leverancier is even uitgebreid getest. Gebruik op
+> eigen risico. Onofficieel; geen affiliatie met de genoemde leveranciers.
+>
+> Feedback en bugreports zijn welkom via de [issues](https://github.com/mvanrijnen/ha-dyntarNL/issues).
 
 ## Ondersteunde leveranciers
 
@@ -31,25 +37,125 @@ Eneco, Tibber, Greenchoice, Zonneplan, ENGIE, DELTA, Vandebron, OXXIO** e.a.
 De integratie haalt **altijd** de kale EPEX-beursprijs op als basis/fallback, zodat de
 beurs-waarde en de teruglever-drempels bij élke leverancier werken.
 
-## Sensoren
+## Entiteiten
 
-Per energietype (**Stroom**, **Gas**) en per prijsbasis (**all-in** en **beurs**): vorig uur,
-huidige prijs, volgend uur, en vandaag/morgen laagste/gemiddeld/hoogste. Plus:
+Na installatie krijg je per energietype een device: **`DynTarNL <leverancier> Stroom`** en
+**`DynTarNL <leverancier> Gas`**. Alle bedragen zijn in €/kWh (stroom) of €/m³ (gas).
 
-- **Component-sensoren**: energiebelasting en inkoopvergoeding (incl. én excl. btw).
-- **Teruglever-sensoren (stroom)**: terugleververgoeding, terugleverkosten, en tellingen —
-  drempel `beursprijs ≤ opslag`.
-- **Binary sensors** om direct op te schakelen (ZeroExport / accu): `prijs negatief` en
-  `terugleveren kost geld` (nu / volgend uur), plus `morgen beschikbaar`.
+> Stroom is per uur; **gas** volgt de Nederlandse **gasdag** (06:00–06:00): de prijs verspringt
+> om 06:00 en is daartussen constant.
 
-De `huidige prijs`-sensoren dragen `today` / `tomorrow` arrays mee (klaar voor ApexCharts).
+### Prijs-sensoren
 
-## CUSTOM-berekening
+Voor **Stroom** én **Gas**, en telkens in twee smaken — **all-in** (wat je betaalt) en **beurs**
+(kale EPEX-marktprijs):
+
+| Sensor | Betekenis |
+| --- | --- |
+| `… vorig uur` | Prijs van het vorige uur |
+| `… huidige prijs` | Prijs van het huidige uur (draagt `today`/`tomorrow` arrays als attribuut) |
+| `… volgend uur` | Prijs van het eerstvolgende uur |
+| `… vandaag laagste` / `… vandaag gemiddeld` / `… vandaag hoogste` | Dagstatistiek vandaag |
+| `… morgen laagste` / `… morgen hoogste` | Morgen (leeg tot de day-ahead prijzen 's middags binnen zijn) |
+
+Voorbeeld entity-id: `sensor.dyntarnl_<leverancier>_stroom_all_in_huidige_prijs`.
+
+### Component-sensoren
+
+De opbouw van het huidige uur, per energietype, **incl. én excl. btw**:
+
+| Sensor | Betekenis |
+| --- | --- |
+| `energiebelasting incl/excl btw` | Overheidsheffing per kWh/m³ |
+| `inkoopvergoeding incl/excl btw` | Opslag van de leverancier per kWh/m³ |
+
+### Attributen op "huidige prijs"
+
+De `huidige prijs`-sensoren dragen de volledige dag-arrays mee, klaar voor
+[ApexCharts](https://github.com/RomRider/apexcharts-card):
+
+- `today` / `tomorrow` — lijst van `{ start, end, price }`
+- `market_price`, `purchase_fee`, `energy_tax` — opbouw van het huidige uur
+- `unit`, `vat_percentage`
+
+## Triggers — teruglevering & negatieve prijzen (alleen stroom)
+
+Bij lage/negatieve prijzen loont terugleveren niet meer. Deze entiteiten zijn bedoeld om er
+**direct op te schakelen** — bv. ZeroExport op een PV-omvormer inschakelen of een accu
+geforceerd laten laden.
+
+**Binary sensors** (perfecte automatiserings-triggers)
+
+| Entiteit | Aan wanneer |
+| --- | --- |
+| `prijs negatief nu` / `… vorig uur` / `… volgend uur` | beursprijs < 0 |
+| `terugleveren kost geld nu` / `… volgend uur` | terugleververgoeding < 0 (beursprijs ≤ opslag) |
+| `morgen beschikbaar` (stroom & gas) | de prijzen van morgen zijn gepubliceerd |
+
+**Sensors**
+
+| Entiteit | Waarde |
+| --- | --- |
+| `terugleververgoeding nu` | €/kWh die je krijgt voor export (kan negatief zijn) |
+| `terugleverkosten nu` / `… volgend uur` | €/kWh die export je kost (0 als het niets kost) |
+| `negatieve uren vandaag` | aantal uren met beursprijs < 0 |
+| `uren terugleveren kost geld vandaag` | aantal uren dat export geld kost |
+
+### Voorbeeld-automatisering: ZeroExport bij ongunstige teruglevering
+
+```yaml
+automation:
+  - alias: ZeroExport aan bij negatieve teruglevering
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.dyntarnl_<leverancier>_stroom_terugleveren_kost_geld_nu
+        to: "on"
+    action:
+      - service: switch.turn_on
+        target: { entity_id: switch.omvormer_zero_export }
+  - alias: ZeroExport uit als teruglevering weer loont
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.dyntarnl_<leverancier>_stroom_terugleveren_kost_geld_nu
+        to: "off"
+    action:
+      - service: switch.turn_off
+        target: { entity_id: switch.omvormer_zero_export }
+```
+
+## Automatische detectie van platform, opslag & tarieven
+
+Je kiest alleen je **merk**; de integratie regelt de rest zelf:
+
+1. **Platform-detectie.** Elk merk is intern gekoppeld aan het juiste platform (eon-app,
+   Frank, EnergyZero of easyEnergy). De bijbehorende publieke prijs-API en het responseformaat
+   worden automatisch gekozen — jij hoeft geen URL of API-type te weten.
+
+2. **Opslag & belasting waar beschikbaar.** Sommige bronnen leveren de **volledige
+   uitsplitsing** (beursprijs + inkoopvergoeding/opslag + energiebelasting): dan worden de
+   component-sensoren en de teruglever-drempel `beursprijs ≤ opslag` **automatisch** met de
+   echte leverancier-opslag gevuld.
+   - *Volledige breakdown:* **eon-app** (Essent, Energiedirect) en **Frank**.
+   - *Alleen marktprijs:* **EnergyZero** en **easyEnergy** leveren geen leverancier-opslag; daar
+     wordt de energiebelasting via de NL-standaard aangevuld en is de opslag `0`. Wil je die
+     leveranciers exact? Gebruik **CUSTOM** en vul je opslag zelf in.
+
+3. **EPEX wordt altijd opgehaald.** Ongeacht je leverancier haalt de integratie áltijd de kale
+   EPEX-beursprijs op als basis en **fallback**. Zo werken de `beurs`-sensoren en de
+   negatieve-prijs/teruglever-triggers bij **élke** leverancier — ook als de leverancier zelf
+   geen uitsplitsing geeft.
+
+4. **CUSTOM: zelf de tarieven, EPEX uit de lucht.** Kies je "Eigen leverancier", dan reken je
+   je all-in prijs op basis van de opgehaalde EPEX + je eigen (excl. btw) opslag en
+   energiebelasting; de btw wordt er automatisch overheen gerekend:
 
 ```
 all-in = (EPEX + opslag + energiebelasting) × (1 + btw%)     (alle invoer excl. btw)
 beurs  = EPEX × (1 + btw%)
 ```
+
+De prijzen van morgen komen 's middags binnen (day-ahead). De integratie ververst bij
+opstarten, elk heel uur, en met extra pogingen tussen 13:00–16:00 tot morgen beschikbaar is.
 
 ## Installatie (HACS)
 
