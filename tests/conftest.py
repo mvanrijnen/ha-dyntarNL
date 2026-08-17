@@ -48,6 +48,7 @@ def _install_ha_stubs() -> None:
 
     core = _mod("homeassistant.core")
     core.HomeAssistant = object
+    core.ServiceCall = object
     core.callback = lambda f: f
 
     _mod("homeassistant.helpers")

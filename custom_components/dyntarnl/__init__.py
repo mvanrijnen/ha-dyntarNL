@@ -3,15 +3,32 @@
 from __future__ import annotations
 
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.helpers.event import async_track_time_change
 
+from .const import DOMAIN
 from .coordinator import DynTarNLConfigEntry, DynTarNLCoordinator
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.BUTTON]
 
 # Uren in de middag waarop de day-ahead prijzen van morgen doorgaans binnenkomen.
 _AFTERNOON_RETRY_HOURS = [13, 14, 15, 16]
+
+SERVICE_REFRESH = "refresh"
+
+
+def _register_services(hass: HomeAssistant) -> None:
+    """Registreer de dyntarnl.refresh-service (overal aanroepbaar)."""
+    if hass.services.has_service(DOMAIN, SERVICE_REFRESH):
+        return
+
+    async def _handle_refresh(_call: ServiceCall) -> None:
+        for entry in hass.config_entries.async_entries(DOMAIN):
+            coordinator: DynTarNLCoordinator | None = getattr(entry, "runtime_data", None)
+            if coordinator is not None:
+                await coordinator.async_request_refresh()
+
+    hass.services.async_register(DOMAIN, SERVICE_REFRESH, _handle_refresh)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -> bool:
@@ -21,6 +38,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -> 
     entry.runtime_data = coordinator
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    _register_services(hass)
 
     @callback
     def _fetch(_now=None) -> None:
@@ -52,4 +70,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -> 
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -> bool:
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unloaded and not hass.config_entries.async_loaded_entries(DOMAIN):
+        hass.services.async_remove(DOMAIN, SERVICE_REFRESH)
+    return unloaded

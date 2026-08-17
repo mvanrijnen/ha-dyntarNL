@@ -99,11 +99,17 @@ Bijv. `sensor.dyntarnl_stroom_all_in_huidige_prijs`, `sensor.dyntarnl_gas_beurs_
 | `binary_sensor.dyntarnl_stroom_terugleveren_kost_geld_volgend_uur` | idem, volgend uur |
 | `binary_sensor.dyntarnl_stroom_morgen_beschikbaar` / `..._gas_...` | prijzen van morgen gepubliceerd |
 
-### Knop / action
+### Knop / actions
 
-| entity_id | Actie |
+| Aanroep | Wat |
 | --- | --- |
-| `button.dyntarnl_ververs_tarieven` | Haalt de tarieven direct opnieuw op (roep aan met `button.press`) |
+| `button.dyntarnl_ververs_tarieven` (via `button.press`) | Knop op de device-pagina; verse data ophalen |
+| **`dyntarnl.refresh`** | Service — overal aanroepbaar, ververst de tarieven direct |
+
+```yaml
+# overal aanroepbaar, bijv. in een automatisering of script:
+action: dyntarnl.refresh
+```
 
 ### Attributen op "huidige prijs"
 

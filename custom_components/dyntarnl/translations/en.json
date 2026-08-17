@@ -37,5 +37,11 @@
         "essent": "Essent"
       }
     }
+  },
+  "services": {
+    "refresh": {
+      "name": "Refresh tariffs",
+      "description": "Fetches the dynamic tariffs again right away."
+    }
   }
 }
