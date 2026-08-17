@@ -29,7 +29,7 @@ class DynTarNLRefreshButton(CoordinatorEntity[DynTarNLCoordinator], ButtonEntity
         self._attr_unique_id = f"{entry_id}_refresh"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_service")},
-            name=f"{NAME} {supplier_name}",
+            name=NAME,
             manufacturer=supplier_name,
             model="Dynamische tarieven",
             entry_type=DeviceEntryType.SERVICE,

@@ -23,9 +23,12 @@ class DynTarNLEntity(CoordinatorEntity[DynTarNLCoordinator]):
         entry_id = coordinator.config_entry.entry_id
         supplier = coordinator.supplier
         supplier_name = supplier.name if supplier else NAME
+        # Geen leverancier in de device-naam -> schone entity_id's (bv.
+        # sensor.dyntarnl_stroom_all_in_huidige_prijs). De leverancier staat als
+        # fabrikant op de device-pagina.
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_{energy}")},
-            name=f"{NAME} {supplier_name} {ENERGY_NAMES[energy]}",
+            name=f"{NAME} {ENERGY_NAMES[energy]}",
             manufacturer=supplier_name,
             model="Dynamische tarieven",
             entry_type=DeviceEntryType.SERVICE,

@@ -61,8 +61,6 @@ class DynTarNLConfigFlow(ConfigFlow, domain=DOMAIN):
             supplier = supplier_by_key(self._supplier)
             if supplier and supplier.platform == PLATFORM_CUSTOM:
                 return await self.async_step_custom()
-            await self.async_set_unique_id(self._supplier)
-            self._abort_if_unique_id_configured()
             return self.async_create_entry(
                 title=supplier.name if supplier else "DynTarNL",
                 data={CONF_SUPPLIER: self._supplier},
@@ -86,8 +84,6 @@ class DynTarNLConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         if user_input is not None:
-            await self.async_set_unique_id(self._supplier)
-            self._abort_if_unique_id_configured()
             return self.async_create_entry(
                 title="Eigen leverancier",
                 data={CONF_SUPPLIER: self._supplier, **user_input},

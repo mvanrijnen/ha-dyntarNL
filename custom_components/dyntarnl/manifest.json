@@ -10,5 +10,6 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/mvanrijnen/ha-dyntarNL/issues",
   "requirements": [],
+  "single_config_entry": true,
   "version": "0.0.2"
 }
