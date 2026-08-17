@@ -45,9 +45,19 @@ def test_easyenergy_parser(monkeypatch, load_fixture, now):
 
     cur = slot_at(data["electricity"].today, now)
     assert cur is not None
-    assert cur.fee == 0.0  # easyEnergy kent geen leverancier-opslag
-    assert abs(cur.total - (cur.market + cur.tax)) < 1e-4
+    # easyEnergy levert de eigen opslag (purchasePrice) en all-in (invoicePrice) mee.
+    assert cur.fee > 0
+    assert abs(cur.total - (cur.market + cur.fee + cur.tax)) < 1e-4
     assert abs(cur.market - cur.market_ex * 1.21) < 1e-3
+
+    # all-in moet exact de invoicePrice uit de API zijn
+    raw = next(
+        r
+        for r in elec["prices"]
+        if src.parse_dt(src._clean_ts(r["from"])) == cur.start
+    )
+    assert abs(cur.total - float(raw["invoicePrice"])) < 1e-6
+    assert abs(cur.fee - float(raw["purchasePrice"])) < 1e-9
 
 
 def test_energyzero_parser(monkeypatch, load_fixture, now):

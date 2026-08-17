@@ -38,18 +38,12 @@ SUPPLIERS: tuple[Supplier, ...] = (
     Supplier("energiedirect", "Energiedirect", PLATFORM_EON_APP, "www.energiedirect.nl"),
     # frank — volledige breakdown
     Supplier("frank", "Frank Energie", PLATFORM_FRANK),
-    # energyzero white-labels — marktprijs + NL-standaard belasting (geen opslag)
-    Supplier("energyzero", "EnergyZero", PLATFORM_ENERGYZERO),
-    Supplier("anwb", "ANWB Energie", PLATFORM_ENERGYZERO),
-    Supplier("coolblue", "Coolblue Energie", PLATFORM_ENERGYZERO),
-    Supplier("energievanons", "Energie VanOns", PLATFORM_ENERGYZERO),
-    Supplier("groenestroomlokaal", "GroeneStroomLokaal", PLATFORM_ENERGYZERO),
-    Supplier("samsam", "SamSam", PLATFORM_ENERGYZERO),
-    Supplier("hegg", "Hegg Energy", PLATFORM_ENERGYZERO),
-    # easyenergy — EPEX + belasting
-    Supplier("nieuwestroom", "Nieuwestroom", PLATFORM_EASYENERGY),
+    # easyenergy — volledige breakdown (beurs + opslag + belasting)
     Supplier("easyenergy", "EasyEnergie", PLATFORM_EASYENERGY),
-    # custom — EPEX + zelf ingevulde opslag/belasting/btw (voor login-only leveranciers)
+    # custom — EPEX + zelf ingevulde opslag/belasting/btw. Voor álle overige
+    # leveranciers, incl. de EnergyZero-merken (ANWB, Coolblue, …) en Nieuwestroom:
+    # die geven geen bruikbare opslag/all-in door (alleen een marktprijs), dus daar
+    # is CUSTOM de juiste route.
     Supplier("custom", "Eigen leverancier (handmatig)", PLATFORM_CUSTOM),
 )
 

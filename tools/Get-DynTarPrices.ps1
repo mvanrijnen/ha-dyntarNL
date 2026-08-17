@@ -107,9 +107,11 @@ function Get-EasyEnergy {
         $url = "https://price-graph.mijn.easyenergy.com/api/prices?start=$s&end=$e&type=$($pair[0])&granularity=$($pair[1])"
         $data = Invoke-RestMethod -Uri $url
         foreach ($r in $data.prices) {
-            $market = [double]$r.priceIncVat; $tax = [double]$r.energyTax
+            # easyEnergy geeft opslag (purchasePrice) en all-in (invoicePrice) mee.
+            $market = [double]$r.priceIncVat; $tax = [double]$r.energyTax; $fee = [double]$r.purchasePrice
+            $allin = if ($r.invoicePrice) { [double]$r.invoicePrice } else { $market + $fee + $tax }
             $res[$pair[0]] += New-Slot (To-Local $r.from) (To-Local $r.until) `
-                ([math]::Round($market,5)) ([math]::Round($market + $tax,5)) 0.0
+                ([math]::Round($market,5)) ([math]::Round($allin,5)) ([math]::Round($fee,5))
         }
     }
     return $res
@@ -120,8 +122,8 @@ function Get-EasyEnergy {
 $suppliers = [ordered]@{
     "Essent / Energiedirect (eon-app)"        = { Get-EonApp "essent.nl" }
     "Frank Energie (frank)"                   = { Get-Frank }
-    "ANWB e.a. (energyzero)"                  = { Get-EnergyZero }
-    "Nieuwestroom / EasyEnergie (easyenergy)" = { Get-EasyEnergy }
+    "EnergyZero (marktprijs, ref)"            = { Get-EnergyZero }
+    "EasyEnergie (easyenergy)"                = { Get-EasyEnergy }
 }
 
 $rows = foreach ($name in $suppliers.Keys) {

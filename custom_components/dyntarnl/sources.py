@@ -116,7 +116,11 @@ async def _easyenergy_rows(
 
 
 async def fetch_easyenergy(session: aiohttp.ClientSession) -> PriceData:
-    """Nieuwestroom-benadering: EPEX-marktprijs + energiebelasting (geen eigen opslag)."""
+    """EasyEnergie: volledige breakdown uit de API.
+
+    easyEnergy levert per uur beurs (price/priceIncVat), energiebelasting (energyTax),
+    de eigen opslag (purchasePrice) en de all-in (invoicePrice) — allemaal incl. btw.
+    """
     result: PriceData = {}
     for energy, unit, gran in ((ELECTRICITY, "kWh", "hour"), (GAS, "m³", "day")):
         rows = await _easyenergy_rows(session, energy, gran)
@@ -124,18 +128,22 @@ async def fetch_easyenergy(session: aiohttp.ClientSession) -> PriceData:
         for r in rows:
             market_ex = float(r["price"])
             market = float(r.get("priceIncVat") or market_ex * 1.21)
-            tax = float(r.get("energyTax") or 0.0)
+            tax = float(r.get("energyTax") or 0.0)  # incl. btw
+            fee = float(r.get("purchasePrice") or 0.0)  # opslag, incl. btw
             factor = market / market_ex if market_ex else 1.21
+            total = float(r["invoicePrice"]) if r.get("invoicePrice") else round(market + fee + tax, 6)
             slots.append(
                 Slot(
                     start=parse_dt(_clean_ts(r["from"])),
                     end=parse_dt(_clean_ts(r["until"])),
-                    total=round(market + tax, 6),
+                    total=round(total, 6),
                     market=market,
                     market_ex=market_ex,
+                    fee=fee,
+                    fee_ex=round(fee / factor, 6) if factor else fee,
                     tax=tax,
                     tax_ex=round(tax / factor, 6) if factor else tax,
-                    vat=round((market - market_ex) + (tax - tax / factor), 6),
+                    vat=round(total - (market_ex + fee / factor + tax / factor), 6) if factor else 0.0,
                 )
             )
         if slots:

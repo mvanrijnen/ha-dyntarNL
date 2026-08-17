@@ -19,26 +19,30 @@ voor de ondersteunde leveranciers.
 
 ## Ondersteunde leveranciers
 
-Je kiest je merk in de config-flow; het **platform** wordt automatisch bepaald. **Elke
-ondersteunde leverancier levert zowel een beurs- als een all-in prijs** — je hoeft niets
-in te vullen. **Alleen bij CUSTOM** vul je zelf je tarieven in.
+Je kiest je merk in de config-flow; het **platform** wordt automatisch bepaald. Alleen
+leveranciers die een **volledige, exacte uitsplitsing** (beurs + opslag + belasting) via een
+publieke API leveren staan in de lijst — dan hoef je niets in te vullen. Alle andere
+leveranciers gebruik je via **CUSTOM**.
 
-| Leverancier | Platform | Beurs | All-in | Opslag |
-| --- | --- | :--: | :--: | --- |
-| Essent, Energiedirect | eon-app | ✅ | ✅ | van leverancier |
-| Frank Energie | frank | ✅ | ✅ | van leverancier |
-| EnergyZero, ANWB Energie, Coolblue Energie, Energie VanOns, GroeneStroomLokaal, SamSam, Hegg Energy | energyzero | ✅ | ✅ | geen (0) |
-| Nieuwestroom, EasyEnergie | easyenergy | ✅ | ✅ | geen (0) |
-| **Eigen leverancier (handmatig)** | custom | ✅ | ✅ | **jij vult in** |
+| Leverancier | Platform | Uitsplitsing |
+| --- | --- | --- |
+| Essent, Energiedirect | eon-app | volledig (beurs + opslag + belasting) |
+| Frank Energie | frank | volledig |
+| EasyEnergie | easyenergy | volledig |
+| **Eigen leverancier (handmatig)** | custom | jij vult opslag + belasting + btw in |
 
-- **Volledige breakdown** (beurs + opslag + belasting): Essent, Energiedirect, Frank.
-- **Beurs + belasting, geen leverancier-opslag** (all-in is een benadering; opslag = 0):
-  EnergyZero-merken en easyEnergy. Wil je het exact? Gebruik **CUSTOM**.
+**Waarom niet elke leverancier in de lijst?** Sommige bronnen geven **alleen een
+marktprijs** door, geen opslag/all-in — dan zouden we een verkeerde all-in tonen. Voor die
+leveranciers is **CUSTOM** de juiste route:
 
-**Staat je leverancier er niet bij?** Kies **CUSTOM**. De EPEX-beursprijs is voor iedereen
-gelijk; je vult éénmalig je opslag + energiebelasting (excl. btw) + btw in, en de integratie
-rekent je all-in prijs exact uit. Zo werken ook login-only leveranciers zoals **Vattenfall,
-Eneco, Tibber, Greenchoice, Zonneplan, ENGIE, DELTA, Vandebron, OXXIO** e.a.
+- **EnergyZero-merken** (ANWB, Coolblue, Energie VanOns, GroeneStroomLokaal, SamSam, Hegg,
+  EnergyZero): de API geeft alleen de marktprijs.
+- **Nieuwestroom**: heeft een dynamische opslag die niet in de API zit.
+- **Login-only** leveranciers (**Vattenfall, Eneco, Tibber, Greenchoice, Zonneplan, ENGIE,
+  DELTA, Vandebron, OXXIO** e.a.): geen publieke prijs-API.
+
+Bij **CUSTOM** vul je éénmalig je opslag + energiebelasting (excl. btw) + btw in; de EPEX-
+beursprijs (voor iedereen gelijk) wordt automatisch opgehaald en je all-in exact berekend.
 
 ## Entiteiten
 
@@ -131,22 +135,17 @@ automation:
 Je kiest alleen je **merk**; de integratie regelt de rest zelf:
 
 1. **Platform-detectie.** Elk merk is intern gekoppeld aan het juiste platform (eon-app,
-   Frank, EnergyZero of easyEnergy). De bijbehorende publieke prijs-API en het responseformaat
-   worden automatisch gekozen — jij hoeft geen URL of API-type te weten.
+   Frank of easyEnergy). De bijbehorende publieke prijs-API en het responseformaat worden
+   automatisch gekozen — jij hoeft geen URL of API-type te weten.
 
-2. **Opslag & belasting waar beschikbaar.** Sommige bronnen leveren de **volledige
-   uitsplitsing** (beursprijs + inkoopvergoeding/opslag + energiebelasting): dan worden de
-   component-sensoren en de teruglever-drempel `beursprijs ≤ opslag` **automatisch** met de
-   echte leverancier-opslag gevuld.
-   - *Volledige breakdown:* **eon-app** (Essent, Energiedirect) en **Frank**.
-   - *Alleen marktprijs:* **EnergyZero** en **easyEnergy** leveren geen leverancier-opslag; daar
-     wordt de energiebelasting via de NL-standaard aangevuld en is de opslag `0`. Wil je die
-     leveranciers exact? Gebruik **CUSTOM** en vul je opslag zelf in.
+2. **Volledige uitsplitsing, automatisch.** Alle leveranciers in de lijst leveren de complete
+   breakdown (beursprijs + opslag + energiebelasting) via hun API. De component-sensoren en de
+   teruglever-drempel `beursprijs ≤ opslag` worden dus **automatisch met de echte
+   leverancier-opslag** gevuld — je hoeft niets in te vullen.
 
-3. **Alleen bij CUSTOM vul je zelf gegevens in.** Bij alle andere leveranciers komt alles
-   automatisch uit de publieke API — je hoeft niets in te vullen. Elke ondersteunde bron
-   levert zowel een **beurs**- als een **all-in**-prijs; alleen ontbreekt bij EnergyZero/
-   easyEnergy de leverancier-opslag (die wordt dan als 0 gerekend).
+3. **Alleen bij CUSTOM vul je zelf gegevens in.** Leveranciers die geen bruikbare opslag/all-in
+   doorgeven (alleen een marktprijs, of een dynamische opslag) staan bewust niet in de lijst;
+   die gebruik je via CUSTOM. Zie [Ondersteunde leveranciers](#ondersteunde-leveranciers).
 
 4. **EPEX alleen indien nodig.** Omdat elke bron zelf al een beursprijs meelevert, wordt de
    kale EPEX **niet** apart opgehaald. Alleen als een bron ooit wél een all-in maar géén
