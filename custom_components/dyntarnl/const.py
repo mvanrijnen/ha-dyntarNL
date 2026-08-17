@@ -39,12 +39,12 @@ SUPPLIERS: tuple[Supplier, ...] = (
     # frank — volledige breakdown
     Supplier("frank", "Frank Energie", PLATFORM_FRANK),
     # easyenergy — volledige breakdown (beurs + opslag + belasting)
-    Supplier("easyenergy", "EasyEnergie", PLATFORM_EASYENERGY),
+    Supplier("easyenergy", "easyEnergy", PLATFORM_EASYENERGY),
     # custom — EPEX + zelf ingevulde opslag/belasting/btw. Voor álle overige
     # leveranciers, incl. de EnergyZero-merken (ANWB, Coolblue, …) en Nieuwestroom:
     # die geven geen bruikbare opslag/all-in door (alleen een marktprijs), dus daar
     # is CUSTOM de juiste route.
-    Supplier("custom", "Eigen leverancier (handmatig)", PLATFORM_CUSTOM),
+    Supplier("custom", "Custom supplier (manual)", PLATFORM_CUSTOM),
 )
 
 

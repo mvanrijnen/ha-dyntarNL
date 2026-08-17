@@ -51,63 +51,57 @@ beursprijs (voor iedereen gelijk) wordt automatisch opgehaald en je all-in exact
 ## Entiteiten (referentie)
 
 Je kiest **één** leverancier; de `entity_id`'s bevatten daarom **geen** leverancier-naam.
-Je krijgt drie devices: **DynTarNL Stroom**, **DynTarNL Gas** en **DynTarNL** (voor de knop).
-De gekozen leverancier staat als *fabrikant* op de device-pagina. Bedragen incl. btw, in
-€/kWh (stroom) of €/m³ (gas).
+De namen zijn **compact & Engels** (alleen `a-z0-9_`). Je krijgt drie devices:
+**DynTarNL E** (stroom), **DynTarNL G** (gas) en **DynTarNL** (voor de knop). De gekozen
+leverancier staat als *fabrikant* op de device-pagina. Bedragen incl. btw, in €/kWh (stroom)
+of €/m³ (gas).
 
 > Stroom is per uur; **gas** volgt de Nederlandse **gasdag** (06:00–06:00): de prijs verspringt
 > om 06:00 en is daartussen constant.
 
-### Prijs-sensoren (stroom & gas, all-in & beurs)
+### Prijs-sensoren (import) — stroom & gas, all-in & beurs
 
-`X` = `stroom` of `gas`, `Y` = `all_in` of `beurs`.
+`X` = `e` (stroom) of `g` (gas), `Y` = `all_in` of `market`.
 
 | entity_id | Betekenis |
 | --- | --- |
-| `sensor.dyntarnl_X_Y_vorig_uur` | Prijs van het vorige uur |
-| `sensor.dyntarnl_X_Y_huidige_prijs` | Prijs van het huidige uur (met `today`/`tomorrow` als attribuut) |
-| `sensor.dyntarnl_X_Y_volgend_uur` | Prijs van het eerstvolgende uur |
-| `sensor.dyntarnl_X_Y_vandaag_laagste` | Laagste prijs vandaag |
-| `sensor.dyntarnl_X_Y_vandaag_gemiddeld` | Gemiddelde prijs vandaag |
-| `sensor.dyntarnl_X_Y_vandaag_hoogste` | Hoogste prijs vandaag |
-| `sensor.dyntarnl_X_Y_morgen_laagste` | Laagste prijs morgen (leeg tot gepubliceerd) |
-| `sensor.dyntarnl_X_Y_morgen_hoogste` | Hoogste prijs morgen (leeg tot gepubliceerd) |
+| `sensor.dyntarnl_X_Y_prev` | Prijs van het vorige uur |
+| `sensor.dyntarnl_X_Y_now` | Prijs van het huidige uur (met `today`/`tomorrow` als attribuut) |
+| `sensor.dyntarnl_X_Y_next` | Prijs van het eerstvolgende uur |
+| `sensor.dyntarnl_X_Y_today_min` / `_today_avg` / `_today_max` | Laagste / gemiddelde / hoogste vandaag |
+| `sensor.dyntarnl_X_Y_tomorrow_min` / `_tomorrow_max` | Laagste / hoogste morgen (leeg tot gepubliceerd) |
 
-Bijv. `sensor.dyntarnl_stroom_all_in_huidige_prijs`, `sensor.dyntarnl_gas_beurs_vandaag_gemiddeld`.
+Bijv. `sensor.dyntarnl_e_all_in_now`, `sensor.dyntarnl_g_market_today_avg`.
 
 ### Component-sensoren (opbouw huidig uur)
 
 | entity_id | Betekenis |
 | --- | --- |
-| `sensor.dyntarnl_X_energiebelasting_incl_btw` / `..._excl_btw` | Energiebelasting per eenheid |
-| `sensor.dyntarnl_X_inkoopvergoeding_incl_btw` / `..._excl_btw` | Opslag van de leverancier |
+| `sensor.dyntarnl_X_tax_incl_vat` / `_tax_excl_vat` | Energiebelasting per eenheid |
+| `sensor.dyntarnl_X_markup_incl_vat` / `_markup_excl_vat` | Opslag (markup) van de leverancier |
 
-### Teruglever-sensoren (alleen stroom)
+### Export-sensoren (teruglevering, alleen stroom = `e`)
 
 | entity_id | Waarde |
 | --- | --- |
-| `sensor.dyntarnl_stroom_terugleververgoeding_nu` | €/kWh voor export dit uur (kan negatief) |
-| `sensor.dyntarnl_stroom_terugleverkosten_nu` | €/kWh die export kost (0 = kost niets) |
-| `sensor.dyntarnl_stroom_terugleverkosten_volgend_uur` | idem, volgend uur |
-| `sensor.dyntarnl_stroom_negatieve_uren_vandaag` | aantal uren met beursprijs < 0 |
-| `sensor.dyntarnl_stroom_uren_terugleveren_kost_geld_vandaag` | aantal uren dat export geld kost |
+| `sensor.dyntarnl_e_export_price_now` | €/kWh voor export dit uur (kan negatief) |
+| `sensor.dyntarnl_e_export_cost_now` / `_export_cost_next` | €/kWh die export kost (0 = kost niets) |
+| `sensor.dyntarnl_e_neg_hours_today` | aantal uren met beursprijs < 0 |
+| `sensor.dyntarnl_e_export_loss_today` | aantal uren dat export geld kost |
 
-### Binary sensors (triggers)
+### Binary sensors (triggers, alleen stroom = `e`)
 
 | entity_id | Aan wanneer |
 | --- | --- |
-| `binary_sensor.dyntarnl_stroom_prijs_negatief_nu` | beursprijs huidige uur < 0 |
-| `binary_sensor.dyntarnl_stroom_prijs_negatief_vorig_uur` | beursprijs vorige uur < 0 |
-| `binary_sensor.dyntarnl_stroom_prijs_negatief_volgend_uur` | beursprijs volgende uur < 0 |
-| `binary_sensor.dyntarnl_stroom_terugleveren_kost_geld_nu` | terugleververgoeding < 0 (beurs ≤ opslag) |
-| `binary_sensor.dyntarnl_stroom_terugleveren_kost_geld_volgend_uur` | idem, volgend uur |
-| `binary_sensor.dyntarnl_stroom_morgen_beschikbaar` / `..._gas_...` | prijzen van morgen gepubliceerd |
+| `binary_sensor.dyntarnl_e_neg_price_now` / `_neg_price_prev` / `_neg_price_next` | beursprijs < 0 |
+| `binary_sensor.dyntarnl_e_export_loss_now` / `_export_loss_next` | export levert niets op (beurs ≤ opslag) |
+| `binary_sensor.dyntarnl_e_tomorrow_available` / `..._g_...` | prijzen van morgen gepubliceerd |
 
 ### Knop / actions
 
 | Aanroep | Wat |
 | --- | --- |
-| `button.dyntarnl_ververs_tarieven` (via `button.press`) | Knop op de device-pagina; verse data ophalen |
+| `button.dyntarnl_refresh` (via `button.press`) | Knop op de device-pagina; verse data ophalen |
 | **`dyntarnl.refresh`** | Service — overal aanroepbaar, ververst de tarieven direct |
 
 ```yaml
@@ -115,9 +109,9 @@ Bijv. `sensor.dyntarnl_stroom_all_in_huidige_prijs`, `sensor.dyntarnl_gas_beurs_
 action: dyntarnl.refresh
 ```
 
-### Attributen op "huidige prijs"
+### Attributen op de `now`-prijssensor
 
-De `huidige prijs`-sensoren dragen de dag-arrays mee, klaar voor
+De `now`-prijssensoren dragen de dag-arrays mee, klaar voor
 [ApexCharts](https://github.com/RomRider/apexcharts-card):
 
 - `today` / `tomorrow` — lijst van `{ start, end, price }`
@@ -131,7 +125,7 @@ automation:
   - alias: ZeroExport aan/uit op teruglevering
     trigger:
       - platform: state
-        entity_id: binary_sensor.dyntarnl_stroom_terugleveren_kost_geld_nu
+        entity_id: binary_sensor.dyntarnl_e_export_loss_now
     action:
       - service: "switch.turn_{{ 'on' if trigger.to_state.state == 'on' else 'off' }}"
         target: { entity_id: switch.omvormer_zero_export }
@@ -179,7 +173,7 @@ De prijs-*array* verandert maar een paar keer per dag, dus de integratie is zuin
   (13:30/14:30/15:30/16:30) tot de prijzen van morgen binnen zijn.
 - **Elk heel uur:** de sensoren rollen mee (huidige prijs, en om 06:00 de gasprijs) — **zonder**
   netwerk-call, puur uit de cache.
-- **Handmatig:** de knop **"Ververs tarieven"** (`button.dyntarnl_ververs_tarieven`, op de device-pagina,
+- **Handmatig:** de knop **"Refresh"** (`button.dyntarnl_refresh`, op de device-pagina,
   onder Configuratie). Die kun je ook vanuit automatiseringen aanroepen via `button.press`.
 
 ## Installatie (HACS)

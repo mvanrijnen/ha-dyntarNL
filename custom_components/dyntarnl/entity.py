@@ -9,7 +9,7 @@ from .const import DOMAIN, ELECTRICITY, GAS, NAME
 from .coordinator import DynTarNLCoordinator
 from .model import EnergyData
 
-ENERGY_NAMES = {ELECTRICITY: "Stroom", GAS: "Gas"}
+ENERGY_NAMES = {ELECTRICITY: "E", GAS: "G"}
 
 
 class DynTarNLEntity(CoordinatorEntity[DynTarNLCoordinator]):
@@ -30,7 +30,7 @@ class DynTarNLEntity(CoordinatorEntity[DynTarNLCoordinator]):
             identifiers={(DOMAIN, f"{entry_id}_{energy}")},
             name=f"{NAME} {ENERGY_NAMES[energy]}",
             manufacturer=supplier_name,
-            model="Dynamische tarieven",
+            model="Dynamic tariffs",
             entry_type=DeviceEntryType.SERVICE,
         )
 

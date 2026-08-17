@@ -85,7 +85,7 @@ class DynTarNLConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         if user_input is not None:
             return self.async_create_entry(
-                title="Eigen leverancier",
+                title="Custom supplier",
                 data={CONF_SUPPLIER: self._supplier, **user_input},
             )
 

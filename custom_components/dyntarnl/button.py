@@ -17,7 +17,7 @@ class DynTarNLRefreshButton(CoordinatorEntity[DynTarNLCoordinator], ButtonEntity
     """Knop 'Ververs tarieven' — haalt de data direct opnieuw op."""
 
     _attr_has_entity_name = True
-    _attr_name = "Ververs tarieven"
+    _attr_name = "Refresh"
     _attr_icon = "mdi:refresh"
     _attr_entity_category = EntityCategory.CONFIG
 
@@ -31,7 +31,7 @@ class DynTarNLRefreshButton(CoordinatorEntity[DynTarNLCoordinator], ButtonEntity
             identifiers={(DOMAIN, f"{entry_id}_service")},
             name=NAME,
             manufacturer=supplier_name,
-            model="Dynamische tarieven",
+            model="Dynamic tariffs",
             entry_type=DeviceEntryType.SERVICE,
         )
 

@@ -98,19 +98,19 @@ class DynTarNLSensorDescription(SensorEntityDescription):
 
 
 _METRICS: tuple[tuple[str, str, str, ValueFn, AttrFn | None], ...] = (
-    ("previous_hour", "vorig uur", "mdi:cash-clock", _previous_hour, None),
-    ("current", "huidige prijs", "mdi:cash", _current, _attributes),
-    ("next_hour", "volgend uur", "mdi:cash-clock", _next_hour, None),
-    ("today_min", "vandaag laagste", "mdi:arrow-down-bold", _today_min, None),
-    ("today_avg", "vandaag gemiddeld", "mdi:approximately-equal", _today_avg, None),
-    ("today_max", "vandaag hoogste", "mdi:arrow-up-bold", _today_max, None),
-    ("tomorrow_min", "morgen laagste", "mdi:arrow-down-bold-outline", _tomorrow_min, None),
-    ("tomorrow_max", "morgen hoogste", "mdi:arrow-up-bold-outline", _tomorrow_max, None),
+    ("previous_hour", "prev", "mdi:cash-clock", _previous_hour, None),
+    ("current", "now", "mdi:cash", _current, _attributes),
+    ("next_hour", "next", "mdi:cash-clock", _next_hour, None),
+    ("today_min", "today min", "mdi:arrow-down-bold", _today_min, None),
+    ("today_avg", "today avg", "mdi:approximately-equal", _today_avg, None),
+    ("today_max", "today max", "mdi:arrow-up-bold", _today_max, None),
+    ("tomorrow_min", "tomorrow min", "mdi:arrow-down-bold-outline", _tomorrow_min, None),
+    ("tomorrow_max", "tomorrow max", "mdi:arrow-up-bold-outline", _tomorrow_max, None),
 )
 
 _BASES: tuple[tuple[str, str, PriceFn], ...] = (
-    ("total", "all-in", lambda s: s.total),
-    ("market", "beurs", lambda s: s.market),
+    ("total", "all in", lambda s: s.total),
+    ("market", "market", lambda s: s.market),
 )
 
 
@@ -157,16 +157,16 @@ class DynTarNLComponentDescription(SensorEntityDescription):
 
 
 _COMPONENTS: tuple[tuple[str, str, str, PriceFn, PriceFn], ...] = (
-    ("energy_tax", "energiebelasting", "mdi:bank", lambda s: s.tax, lambda s: s.tax_ex),
-    ("purchase_fee", "inkoopvergoeding", "mdi:cash-plus", lambda s: s.fee, lambda s: s.fee_ex),
+    ("energy_tax", "tax", "mdi:bank", lambda s: s.tax, lambda s: s.tax_ex),
+    ("purchase_fee", "markup", "mdi:cash-plus", lambda s: s.fee, lambda s: s.fee_ex),
 )
 
 
 def _component_descriptions() -> list[DynTarNLComponentDescription]:
     out: list[DynTarNLComponentDescription] = []
     for base_key, label, icon, incl_fn, excl_fn in _COMPONENTS:
-        out.append(DynTarNLComponentDescription(key=f"{base_key}_incl_vat", name=f"{label} incl btw", icon=icon, suggested_display_precision=5, value_fn=incl_fn))
-        out.append(DynTarNLComponentDescription(key=f"{base_key}_excl_vat", name=f"{label} excl btw", icon=icon, suggested_display_precision=5, value_fn=excl_fn))
+        out.append(DynTarNLComponentDescription(key=f"{base_key}_incl_vat", name=f"{label} incl VAT", icon=icon, suggested_display_precision=5, value_fn=incl_fn))
+        out.append(DynTarNLComponentDescription(key=f"{base_key}_excl_vat", name=f"{label} excl VAT", icon=icon, suggested_display_precision=5, value_fn=excl_fn))
     return out
 
 
@@ -231,11 +231,11 @@ class DynTarNLFeedInDescription(SensorEntityDescription):
 
 
 _FEEDIN_SENSORS: tuple[DynTarNLFeedInDescription, ...] = (
-    DynTarNLFeedInDescription(key="feedin_compensation_now", name="terugleververgoeding nu", icon="mdi:transmission-tower-export", suggested_display_precision=5, compute=_feedin_compensation),
-    DynTarNLFeedInDescription(key="feedin_cost_now", name="terugleverkosten nu", icon="mdi:cash-minus", suggested_display_precision=5, compute=_feedin_cost_now),
-    DynTarNLFeedInDescription(key="feedin_cost_next_hour", name="terugleverkosten volgend uur", icon="mdi:cash-minus", suggested_display_precision=5, compute=_feedin_cost_next),
-    DynTarNLFeedInDescription(key="negative_hours_today", name="negatieve uren vandaag", icon="mdi:counter", suggested_display_precision=0, compute=_negative_hours_today, is_hours=True),
-    DynTarNLFeedInDescription(key="feedin_cost_hours_today", name="uren terugleveren kost geld vandaag", icon="mdi:counter", suggested_display_precision=0, compute=_feedin_cost_hours_today, is_hours=True),
+    DynTarNLFeedInDescription(key="feedin_compensation_now", name="export price now", icon="mdi:transmission-tower-export", suggested_display_precision=5, compute=_feedin_compensation),
+    DynTarNLFeedInDescription(key="feedin_cost_now", name="export cost now", icon="mdi:cash-minus", suggested_display_precision=5, compute=_feedin_cost_now),
+    DynTarNLFeedInDescription(key="feedin_cost_next_hour", name="export cost next", icon="mdi:cash-minus", suggested_display_precision=5, compute=_feedin_cost_next),
+    DynTarNLFeedInDescription(key="negative_hours_today", name="neg hours today", icon="mdi:counter", suggested_display_precision=0, compute=_negative_hours_today, is_hours=True),
+    DynTarNLFeedInDescription(key="feedin_cost_hours_today", name="export loss today", icon="mdi:counter", suggested_display_precision=0, compute=_feedin_cost_hours_today, is_hours=True),
 )
 
 

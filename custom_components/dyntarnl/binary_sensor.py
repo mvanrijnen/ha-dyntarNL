@@ -66,16 +66,16 @@ class DynTarNLBinaryDescription(BinarySensorEntityDescription):
 
 
 _BINARY_SENSORS: tuple[DynTarNLBinaryDescription, ...] = (
-    DynTarNLBinaryDescription(key="price_negative_now", name="prijs negatief nu", icon="mdi:cash-minus", state_fn=_neg_now),
-    DynTarNLBinaryDescription(key="price_negative_previous_hour", name="prijs negatief vorig uur", icon="mdi:cash-minus", state_fn=_neg_prev),
-    DynTarNLBinaryDescription(key="price_negative_next_hour", name="prijs negatief volgend uur", icon="mdi:cash-minus", state_fn=_neg_next),
-    DynTarNLBinaryDescription(key="feedin_costs_money_now", name="terugleveren kost geld nu", icon="mdi:transmission-tower-export", state_fn=_cost_now),
-    DynTarNLBinaryDescription(key="feedin_costs_money_next_hour", name="terugleveren kost geld volgend uur", icon="mdi:transmission-tower-export", state_fn=_cost_next),
+    DynTarNLBinaryDescription(key="price_negative_now", name="neg price now", icon="mdi:cash-minus", state_fn=_neg_now),
+    DynTarNLBinaryDescription(key="price_negative_previous_hour", name="neg price prev", icon="mdi:cash-minus", state_fn=_neg_prev),
+    DynTarNLBinaryDescription(key="price_negative_next_hour", name="neg price next", icon="mdi:cash-minus", state_fn=_neg_next),
+    DynTarNLBinaryDescription(key="feedin_costs_money_now", name="export loss now", icon="mdi:transmission-tower-export", state_fn=_cost_now),
+    DynTarNLBinaryDescription(key="feedin_costs_money_next_hour", name="export loss next", icon="mdi:transmission-tower-export", state_fn=_cost_next),
 )
 
 
 class DynTarNLTomorrowAvailable(DynTarNLEntity, BinarySensorEntity):
-    _attr_name = "morgen beschikbaar"
+    _attr_name = "tomorrow available"
     _attr_icon = "mdi:calendar-clock"
 
     def __init__(self, coordinator, energy: str) -> None:
