@@ -63,6 +63,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -> 
     entry.async_on_unload(
         async_track_time_change(hass, _hourly, minute=0, second=10)
     )
+
     @callback
     def _retry_tomorrow(_now=None) -> None:
         """Elk half uur vanaf 13:00: alleen ophalen zolang morgen nog ontbreekt."""
