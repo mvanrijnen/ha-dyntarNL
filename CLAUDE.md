@@ -19,8 +19,9 @@ pytest tests/test_sources.py::test_frank_parser -q            # single test
 pytest -k gasday
 ```
 
-CI (`.github/workflows/`): `pytest` on Python 3.13, plus hassfest and the HACS action
-(`ignore: brands` — dyntarnl is not on the brands CDN and never will be, see below).
+CI (`.github/workflows/`): `pytest` on Python 3.13, plus hassfest and the HACS action.
+The HACS action runs with no `ignore:` — it passes on the in-integration `brand/` directory
+(see below), which is also a precondition for the hacs/default store listing.
 
 There is no linter/formatter configured. Tests are the only gate.
 
@@ -31,13 +32,16 @@ The `gh` CLI is authenticated as `mvanrijnen`; use it for issues, PRs, releases 
 
 Releases are what HACS installs, so the order matters:
 
-1. Bump `"version"` in `custom_components/dyntarnl/manifest.json` **first**,
-   and update the version mentioned in the README banner.
+1. Bump `"version"` in `custom_components/dyntarnl/manifest.json` **first**.
 2. Commit, push, then `gh release create vX.Y.Z --generate-notes`.
 
 The tag must point at a commit whose manifest already carries that version — HACS reads the
 version out of the tarball's manifest, not out of the tag. (`v0.1.0` was cut one commit early
-and ships `"version": "0.0.2"`; don't repeat that.)
+and ships `"version": "0.0.2"`; don't repeat that.) No version is hard-coded in README.md or
+info.md any more — the release badge reads it from the GitHub API, so nothing goes stale.
+
+Since 1.0.0 the entity ids are a public contract: renaming one breaks every dashboard and
+automation out there, so it takes a major release.
 
 ## Architecture
 

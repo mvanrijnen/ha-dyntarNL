@@ -14,4 +14,4 @@ Je kiest je leverancier; de integratie bepaalt zelf het platform en de publieke 
 Prijs-sensoren (all-in & beurs) voor stroom en gas, component-sensoren (belasting/opslag),
 en teruglever-/negatieve-prijs binary sensors om direct op te schakelen (ZeroExport / accu).
 
-> In ontwikkeling (v0.1.1). Onofficieel; geen affiliatie met de leveranciers.
+> Onofficieel; geen affiliatie met de leveranciers.

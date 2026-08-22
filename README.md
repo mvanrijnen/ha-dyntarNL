@@ -7,17 +7,19 @@
 [![Tests](https://github.com/mvanrijnen/ha-dyntarNL/actions/workflows/test.yml/badge.svg)](https://github.com/mvanrijnen/ha-dyntarNL/actions/workflows/test.yml)
 [![Validate](https://github.com/mvanrijnen/ha-dyntarNL/actions/workflows/validate.yml/badge.svg)](https://github.com/mvanrijnen/ha-dyntarNL/actions/workflows/validate.yml)
 [![hacs](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![release](https://img.shields.io/github/v/release/mvanrijnen/ha-dyntarNL)](https://github.com/mvanrijnen/ha-dyntarNL/releases)
 
 Home Assistant integratie die de **dynamische energietarieven van meerdere Nederlandse
 leveranciers** als sensoren publiceert. Je kiest je leverancier; de integratie bepaalt zelf
 welk platform en welke publieke prijs-API erbij hoort. **Geen account of API-sleutel nodig**
 voor de ondersteunde leveranciers.
 
-> ## 🧪 Experimenteel — v0.1.1
+> ## Stabiel — klaar voor dagelijks gebruik
 >
-> Deze integratie is **nog experimenteel en volop in ontwikkeling**. Dingen kunnen wijzigen
-> of (tijdelijk) stuk zijn, en niet elke leverancier is even uitgebreid getest. Gebruik op
-> eigen risico. Onofficieel; geen affiliatie met de genoemde leveranciers.
+> De integratie draait in productie en de entiteiten liggen vast: vanaf 1.0 verandert er niets
+> meer aan bestaande `entity_id`'s zonder een major release. Niet elke leverancier is even
+> uitgebreid in de praktijk beproefd — wijkt een prijs af, meld het gerust.
+> Onofficieel; geen affiliatie met de genoemde leveranciers.
 >
 > Feedback en bugreports zijn welkom via de [issues](https://github.com/mvanrijnen/ha-dyntarNL/issues).
 
