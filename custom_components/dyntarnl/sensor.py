@@ -77,11 +77,21 @@ def _attributes(data: EnergyData, now: datetime, price: PriceFn) -> dict:
             for s in slots
         ]
 
+    # Alle uren die de coordinator in cache heeft, op volgorde (gisteren t/m morgen).
+    all_slots = (data.yesterday or []) + data.today + (data.tomorrow or [])
+
     attrs: dict = {
         "unit": data.unit,
         "vat_percentage": data.vat_percentage,
+        "yesterday": series(data.yesterday) if data.yesterday else None,
         "today": series(data.today),
         "tomorrow": series(data.tomorrow) if data.tomorrow else None,
+        # Kant-en-klare grafiekreeks over álle dagen: [epoch-ms, prijs]. Precies het
+        # formaat dat ApexCharts verwacht, dus een kaart kan dit 1-op-1 plotten.
+        "prices": [
+            [int(s.start.timestamp() * 1000), round(price(s), PRICE_PRECISION)]
+            for s in all_slots
+        ],
     }
     current = _slot_at(data.today, now)
     if current is not None:

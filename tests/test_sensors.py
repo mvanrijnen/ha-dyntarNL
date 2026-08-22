@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from dyntarnl.model import EnergyData, Slot
 from dyntarnl.sensor import (
     _COMPONENT_SENSORS,
+    _attributes,
     _feedin_cost_hours_today,
     _feedin_cost_now,
     _negative_hours_today,
@@ -71,3 +72,72 @@ def test_feedin_cost_now_positive_when_below_markup():
 def test_today_avg():
     ed = _energy([_slot(h, 0.10) for h in range(24)])
     assert abs(_today_avg(ed, NOW, lambda s: s.market) - 0.10) < 1e-9
+
+
+def _slot_on(day: int, hour: int, market: float) -> Slot:
+    start = datetime(2026, 8, day, hour, tzinfo=AMS)
+    return Slot(
+        start=start,
+        end=start + timedelta(hours=1),
+        total=market + 0.135,
+        market=market,
+        market_ex=market / 1.21,
+    )
+
+
+def test_attributes_expose_all_cached_days():
+    """De now-sensor draagt gisteren t/m morgen mee, zodat een grafiek alle
+    uren kan tekenen die de coordinator in cache heeft."""
+    ed = EnergyData(
+        unit="kWh",
+        vat_percentage=21.0,
+        yesterday=[_slot_on(16, h, 0.20) for h in range(24)],
+        today=[_slot_on(17, h, 0.30) for h in range(24)],
+        tomorrow=[_slot_on(18, h, 0.40) for h in range(24)],
+    )
+    attrs = _attributes(ed, NOW, lambda s: s.total)
+
+    assert [len(attrs[k]) for k in ("yesterday", "today", "tomorrow")] == [24, 24, 24]
+    combined = attrs["yesterday"] + attrs["today"] + attrs["tomorrow"]
+    starts = [e["start"] for e in combined]
+    assert starts == sorted(starts)  # aaneengesloten, chronologisch
+    assert attrs["yesterday"][0]["price"] == round(0.20 + 0.135, 5)
+
+
+def test_attributes_omit_missing_days():
+    ed = EnergyData(unit="kWh", vat_percentage=21.0, today=[_slot_on(17, 12, 0.30)])
+    attrs = _attributes(ed, NOW, lambda s: s.total)
+    assert attrs["yesterday"] is None and attrs["tomorrow"] is None
+
+
+def test_prices_array_is_chart_ready():
+    """`prices` is één platte [epoch-ms, prijs]-reeks over alle gecachete dagen."""
+    ed = EnergyData(
+        unit="kWh",
+        vat_percentage=21.0,
+        yesterday=[_slot_on(16, h, 0.20) for h in range(24)],
+        today=[_slot_on(17, h, 0.30) for h in range(24)],
+        tomorrow=[_slot_on(18, h, 0.40) for h in range(24)],
+    )
+    prices = _attributes(ed, NOW, lambda s: s.total)["prices"]
+
+    assert len(prices) == 72
+    assert all(isinstance(ts, int) and isinstance(v, float) for ts, v in prices)
+    stamps = [ts for ts, _ in prices]
+    assert stamps == sorted(stamps)
+    # aaneengesloten uren, geen gaten
+    assert {b - a for a, b in zip(stamps, stamps[1:])} == {3_600_000}
+    # eerste punt is gisteren 00:00 lokaal en hoort bij de eerste yesterday-slot
+    assert stamps[0] == int(datetime(2026, 8, 16, 0, tzinfo=AMS).timestamp() * 1000)
+
+
+def test_prices_array_matches_day_arrays():
+    ed = EnergyData(
+        unit="kWh",
+        vat_percentage=21.0,
+        today=[_slot_on(17, h, 0.30) for h in range(24)],
+        tomorrow=[_slot_on(18, h, 0.40) for h in range(24)],
+    )
+    attrs = _attributes(ed, NOW, lambda s: s.total)
+    from_days = [e["price"] for e in attrs["today"] + attrs["tomorrow"]]
+    assert [v for _, v in attrs["prices"]] == from_days

@@ -111,12 +111,109 @@ action: dyntarnl.refresh
 
 ### Attributen op de `now`-prijssensor
 
-De `now`-prijssensoren dragen de dag-arrays mee, klaar voor
-[ApexCharts](https://github.com/RomRider/apexcharts-card):
+De `now`-prijssensoren dragen alle uren mee die de integratie in cache heeft:
 
-- `today` / `tomorrow` — lijst van `{ start, end, price }`
+- `prices` — **kant-en-klare grafiekreeks** over álle dagen: lijst van `[epoch-ms, prijs]`
+- `yesterday` / `today` / `tomorrow` — lijst van `{ start, end, price }`, handig in templates
+  (`yesterday` en `tomorrow` zijn `null` zolang die dag er niet is)
 - `market_price`, `purchase_fee`, `energy_tax` — opbouw van het huidige uur
 - `unit`, `vat_percentage`
+
+De prijs is steeds die van de sensor zelf: op `..._all_in_now` staan de all-in prijzen, op
+`..._market_now` de beursprijzen.
+
+### Voorbeeld-kaart: all-in én beurs in één grafiek
+
+`prices` staat al in het formaat dat [ApexCharts](https://github.com/RomRider/apexcharts-card)
+verwacht, dus de `data_generator` is per serie één regel. Elke `now`-sensor draagt zijn eigen
+reeks: `..._all_in_now` de all-in prijzen, `..._market_now` de kale beurs.
+
+```yaml
+type: custom:apexcharts-card
+grid_options:
+  columns: full          # volle breedte in de sections-weergave
+experimental:
+  color_threshold: true
+header:
+  show: true
+  title: Stroom (€/kWh)
+  show_states: true
+  colorize_states: true
+graph_span: 72h          # gisteren + vandaag + morgen
+span:
+  start: day
+  offset: -1d            # begin bij gisteren 00:00, anders valt die dag buiten beeld
+now:
+  show: true
+  label: nu
+  color: var(--error-color)
+yaxis:
+  - min: ~0              # zachte nul: zakt mee als de beurs negatief wordt
+    max: ~0.40
+    decimals: 2
+apex_config:
+  chart:
+    height: 320px
+  tooltip:
+    x:
+      format: ddd d MMM - HH:mm
+  xaxis:
+    labels:
+      format: ddd HH:mm  # zonder dagnaam leest elk label '00:00'
+series:
+  - entity: sensor.dyntarnl_e_all_in_now
+    name: all-in
+    type: column
+    extend_to: false     # niet doortrekken tot het eind van het venster
+    float_precision: 3
+    unit: " €/kWh"
+    show:
+      extremas: true
+      header_color_threshold: true
+    color_threshold:
+      - value: -1
+        color: "#1b5e20"
+      - value: 0
+        color: "#43a047"
+      - value: 0.25
+        color: "#fbc02d"
+      - value: 0.40
+        color: "#e53935"
+    data_generator: |
+      return entity.attributes.prices;
+  - entity: sensor.dyntarnl_e_market_now
+    name: beurs
+    type: line
+    curve: stepline
+    stroke_width: 2
+    color: var(--primary-color)
+    extend_to: false
+    float_precision: 3
+    unit: " €/kWh"
+    data_generator: |
+      return entity.attributes.prices;
+```
+
+Het verschil tussen de lijn en de kolommen is precies je opslag + energiebelasting.
+
+**Alleen de beurs?** Laat de eerste serie weg en zet de drempels lager — beursprijzen liggen
+een stuk dichter bij nul en duiken er regelmatig onder:
+
+```yaml
+    color_threshold:
+      - value: -0.02
+        color: "#1b5e20"
+      - value: 0
+        color: "#43a047"
+      - value: 0.10
+        color: "#fbc02d"
+      - value: 0.20
+        color: "#e53935"
+```
+
+Voor gas werkt dezelfde kaart met `sensor.dyntarnl_g_all_in_now` / `..._g_market_now`; die
+tekent blokken van de gasdag (06:00–06:00). Zolang de prijzen van morgen nog niet gepubliceerd
+zijn blijft het laatste etmaal leeg.
 
 ### Voorbeeld-automatisering: ZeroExport bij ongunstige teruglevering
 
