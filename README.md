@@ -130,6 +130,12 @@ De prijs is steeds die van de sensor zelf: op `..._all_in_now` staan de all-in p
 verwacht, dus de `data_generator` is per serie één regel. Elke `now`-sensor draagt zijn eigen
 reeks: `..._all_in_now` de all-in prijzen, `..._market_now` de kale beurs.
 
+![Grafiek: all-in prijzen als kolommen, beursprijs als lijn, gisteren t/m morgen](docs/priceoverview.png)
+
+*De kolommen zijn de all-in prijs — groen onder €0,25, geel daarboven. De blauwe stepline is de
+kale beurs; het verschil ertussen is je opslag + energiebelasting. De stippellijn is `nu`. Het
+laatste etmaal is nog leeg omdat de prijzen van morgen op dat moment nog niet gepubliceerd waren.*
+
 ```yaml
 type: custom:apexcharts-card
 grid_options:
