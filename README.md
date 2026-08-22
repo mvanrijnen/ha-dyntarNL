@@ -13,7 +13,7 @@ leveranciers** als sensoren publiceert. Je kiest je leverancier; de integratie b
 welk platform en welke publieke prijs-API erbij hoort. **Geen account of API-sleutel nodig**
 voor de ondersteunde leveranciers.
 
-> ## 🧪 Experimenteel — v0.0.1
+> ## 🧪 Experimenteel — v0.1.1
 >
 > Deze integratie is **nog experimenteel en volop in ontwikkeling**. Dingen kunnen wijzigen
 > of (tijdelijk) stuk zijn, en niet elke leverancier is even uitgebreid getest. Gebruik op
