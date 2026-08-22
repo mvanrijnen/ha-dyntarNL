@@ -23,6 +23,3 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
-          # 'brands' vereist een logo-PR bij home-assistant/brands (later);
-          # blokkeert custom-repository installatie niet.
-          ignore: brands
