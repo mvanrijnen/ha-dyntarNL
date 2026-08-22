@@ -8,11 +8,14 @@ from homeassistant.helpers.event import async_track_time_change
 
 from .const import DOMAIN
 from .coordinator import DynTarNLConfigEntry, DynTarNLCoordinator
+from .model import tomorrow_complete
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.BUTTON]
 
-# Uren in de middag waarop de day-ahead prijzen van morgen doorgaans binnenkomen.
-_AFTERNOON_RETRY_HOURS = [13, 14, 15, 16]
+# Vanaf 13:00 kunnen de day-ahead prijzen van morgen binnenkomen -- stroom meestal
+# rond het middaguur, gas beduidend later. We proberen het elk half uur opnieuw tot
+# ze er zijn; zodra ze binnen zijn stopt het vanzelf, dus het blijft zuinig.
+_TOMORROW_RETRY_HOURS = list(range(13, 24))
 
 SERVICE_REFRESH = "refresh"
 
@@ -60,10 +63,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -> 
     entry.async_on_unload(
         async_track_time_change(hass, _hourly, minute=0, second=10)
     )
-    # 2) 's Middags extra ophalen tot de prijzen van morgen binnen zijn.
+    @callback
+    def _retry_tomorrow(_now=None) -> None:
+        """Elk half uur vanaf 13:00: alleen ophalen zolang morgen nog ontbreekt."""
+        if not tomorrow_complete(coordinator.data):
+            _fetch()
+
+    # 2) Doorproberen tot de prijzen van morgen binnen zijn (ook 's avonds).
     entry.async_on_unload(
         async_track_time_change(
-            hass, lambda now: _fetch(), hour=_AFTERNOON_RETRY_HOURS, minute=30, second=10
+            hass, _retry_tomorrow, hour=_TOMORROW_RETRY_HOURS, minute=30, second=10
         )
     )
     return True

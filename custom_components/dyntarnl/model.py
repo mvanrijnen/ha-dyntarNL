@@ -40,6 +40,15 @@ class EnergyData:
 type PriceData = dict[str, EnergyData]
 
 
+def tomorrow_complete(data: PriceData | None) -> bool:
+    """True zodra voor élk energietype de prijzen van morgen binnen zijn.
+
+    Stuurt de ophaal-retries aan: zolang dit False is blijft de integratie het
+    's middags/'s avonds opnieuw proberen.
+    """
+    return bool(data) and all(ed.tomorrow for ed in data.values())
+
+
 def parse_dt(value: str) -> datetime:
     """Parse een ISO-datumtijd naar lokale (NL) tijd."""
     parsed = dt_util.parse_datetime(value)

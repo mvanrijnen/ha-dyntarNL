@@ -274,8 +274,10 @@ bron. Standaard staat 'ie op easyEnergy — laat dat gerust staan als je twijfel
 
 De prijs-*array* verandert maar een paar keer per dag, dus de integratie is zuinig met de API:
 
-- **Data ophalen:** bij opstarten, kort na middernacht (nieuwe dag), en 's middags
-  (13:30/14:30/15:30/16:30) tot de prijzen van morgen binnen zijn.
+- **Data ophalen:** bij opstarten, kort na middernacht (nieuwe dag), en vanaf 13:30 elk half
+  uur **tot de prijzen van morgen binnen zijn** — daarna stopt het vanzelf tot de volgende dag.
+  Stroom komt meestal rond het middaguur binnen, gas vaak pas 's avonds; daarom loopt het
+  doorproberen door tot 23:30.
 - **Elk heel uur:** de sensoren rollen mee (huidige prijs, en om 06:00 de gasprijs) — **zonder**
   netwerk-call, puur uit de cache.
 - **Handmatig:** de knop **"Refresh"** (`button.dyntarnl_refresh`, op de device-pagina,

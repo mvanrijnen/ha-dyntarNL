@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta, timezone
 
-from dyntarnl.model import Slot, bucket_by_day, parse_dt
+from dyntarnl.model import EnergyData, Slot, bucket_by_day, parse_dt, tomorrow_complete
 
 AMS = timezone(timedelta(hours=2))
 
@@ -42,3 +42,21 @@ def test_parse_dt_utc_becomes_local():
 def test_parse_dt_naive_is_local():
     parsed = parse_dt("2026-08-17T05:00:00")
     assert parsed.hour == 5
+
+
+def _ed(tomorrow):
+    slot = Slot(start=None, end=None, total=0.3, market=0.2, market_ex=0.16)
+    return EnergyData(unit="kWh", vat_percentage=21.0, today=[slot],
+                      tomorrow=[slot] if tomorrow else None)
+
+
+def test_tomorrow_complete_needs_every_energy_type():
+    """Gas publiceert later dan stroom; pas als álles binnen is stoppen de retries."""
+    assert tomorrow_complete({"electricity": _ed(True), "gas": _ed(True)})
+    assert not tomorrow_complete({"electricity": _ed(True), "gas": _ed(False)})
+    assert not tomorrow_complete({"electricity": _ed(False), "gas": _ed(False)})
+
+
+def test_tomorrow_complete_on_empty_data():
+    assert not tomorrow_complete(None)
+    assert not tomorrow_complete({})
