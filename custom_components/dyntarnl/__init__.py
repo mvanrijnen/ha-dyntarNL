@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.helpers.event import async_track_time_change
@@ -16,6 +18,17 @@ PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.B
 # rond het middaguur, gas beduidend later. We proberen het elk half uur opnieuw tot
 # ze er zijn; zodra ze binnen zijn stopt het vanzelf, dus het blijft zuinig.
 _TOMORROW_RETRY_HOURS = list(range(13, 24))
+
+
+def _spread(entry_id: str, span: int) -> int:
+    """Vaste, per installatie verschillende offset in minuten.
+
+    Zonder dit klopt élke DynTarNL-installatie op exact dezelfde seconde bij de
+    leverancier aan. De offset komt uit de entry_id, dus hij is stabiel over
+    herstarts heen (geen willekeur die elke keer opnieuw loot).
+    """
+    return int(hashlib.sha256(entry_id.encode()).hexdigest(), 16) % span
+
 
 SERVICE_REFRESH = "refresh"
 
@@ -70,10 +83,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -> 
         if not tomorrow_complete(coordinator.data):
             _fetch()
 
-    # 2) Doorproberen tot de prijzen van morgen binnen zijn (ook 's avonds).
+    # 2) Doorproberen tot de prijzen van morgen binnen zijn (ook 's avonds). Elk half
+    #    uur, op een minuut die per installatie verschilt — anders vragen alle
+    #    installaties tegelijk aan bij de leverancier.
+    offset = _spread(entry.entry_id, 30)
     entry.async_on_unload(
         async_track_time_change(
-            hass, _retry_tomorrow, hour=_TOMORROW_RETRY_HOURS, minute=30, second=10
+            hass,
+            _retry_tomorrow,
+            hour=_TOMORROW_RETRY_HOURS,
+            minute=[offset, offset + 30],
+            second=20,
         )
     )
     return True
