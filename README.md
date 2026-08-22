@@ -132,6 +132,11 @@ reeks: `..._all_in_now` de all-in prijzen, `..._market_now` de kale beurs.
 
 ![Grafiek: all-in prijzen als kolommen, beursprijs als lijn, gisteren t/m morgen](docs/priceoverview.png)
 
+> De kaart ververst zichzelf elke 5 minuten. Dat is nodig omdat apexcharts-card standaard
+> alleen hertekent bij een **state**-wijziging, terwijl deze grafiek uit de **attributen** leest:
+> zonder `update_interval` verschijnen de prijzen van morgen pas zodra de prijs van het huidige
+> uur verandert.
+
 *De kolommen zijn de all-in prijs — groen onder €0,25, geel daarboven. De blauwe stepline is de
 kale beurs; het verschil ertussen is je opslag + energiebelasting. De stippellijn is `nu`. Het
 laatste etmaal is nog leeg omdat de prijzen van morgen op dat moment nog niet gepubliceerd waren.*
@@ -147,6 +152,8 @@ header:
   title: Stroom (€/kWh)
   show_states: true
   colorize_states: true
+update_interval: 5min    # kaart leest attributen; zonder dit hertekent hij pas
+                         # als de prijs van het huidige uur verandert
 graph_span: 72h          # gisteren + vandaag + morgen
 span:
   start: day
