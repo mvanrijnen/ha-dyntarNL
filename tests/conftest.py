@@ -27,14 +27,68 @@ def _mod(name: str) -> types.ModuleType:
     return module
 
 
+def _install_voluptuous_stub() -> None:
+    """Minimale voluptuous: genoeg voor schema's bouwen en defaults invullen."""
+    vol = _mod("voluptuous")
+
+    class _Marker(str):
+        def __new__(cls, key, default=None, **kw):
+            obj = super().__new__(cls, key)
+            obj.default = default
+            return obj
+
+    vol.Required = type("Required", (_Marker,), {})
+    vol.Optional = type("Optional", (_Marker,), {})
+    vol.Invalid = type("Invalid", (Exception,), {})
+
+    class Schema:
+        def __init__(self, schema):
+            self.schema = schema
+
+        def __call__(self, data):
+            out = dict(data)
+            for key in self.schema:
+                if key not in out and getattr(key, "default", None) is not None:
+                    out[str(key)] = key.default
+            return out
+
+    vol.Schema = Schema
+    vol.In = lambda options: options
+    vol.Coerce = lambda typ: typ
+    vol.Range = lambda **k: k
+    vol.All = lambda *validators: validators
+
+
 def _install_ha_stubs() -> None:
     aiohttp = _mod("aiohttp")
     aiohttp.ClientError = type("ClientError", (Exception,), {})
     aiohttp.ClientTimeout = lambda **k: None
     aiohttp.ClientSession = object
 
+    _install_voluptuous_stub()
+
     _mod("homeassistant")
-    _mod("homeassistant.config_entries").ConfigEntry = object
+    ce = _mod("homeassistant.config_entries")
+    ce.ConfigEntry = object
+    ce.ConfigFlowResult = dict
+
+    class _FlowBase:
+        def async_show_form(self, **kw):
+            return {"type": "form", "errors": None, **kw}
+
+        def async_create_entry(self, **kw):
+            return {"type": "create_entry", **kw}
+
+    class ConfigFlow(_FlowBase):
+        def __init_subclass__(cls, domain=None, **kw):
+            super().__init_subclass__(**kw)
+
+    ce.ConfigFlow = ConfigFlow
+    ce.OptionsFlow = type("OptionsFlow", (_FlowBase,), {})
+
+    exc = _mod("homeassistant.exceptions")
+    exc.HomeAssistantError = type("HomeAssistantError", (Exception,), {})
+    exc.ServiceValidationError = type("ServiceValidationError", (exc.HomeAssistantError,), {})
 
     const = _mod("homeassistant.const")
     const.CURRENCY_EURO = "€"
@@ -50,14 +104,76 @@ def _install_ha_stubs() -> None:
     core.HomeAssistant = object
     core.ServiceCall = object
     core.callback = lambda f: f
+    core.ServiceResponse = dict
+    core.SupportsResponse = type("SupportsResponse", (), {"ONLY": "only", "OPTIONAL": "optional"})
 
-    _mod("homeassistant.helpers")
+    helpers = _mod("homeassistant.helpers")
     _mod("homeassistant.helpers.aiohttp_client").async_get_clientsession = lambda hass: None
     _mod("homeassistant.helpers.event").async_track_time_change = lambda *a, **k: None
 
+    cv = _mod("homeassistant.helpers.config_validation")
+    cv.boolean = bool
+    cv.string = str
+    helpers.config_validation = cv
+
+    storage = _mod("homeassistant.helpers.storage")
+
+    class Store:
+        """In-memory Store: per sleutel één dict, gedeeld over instanties."""
+
+        data: dict = {}
+
+        def __init__(self, hass, version, key, **kw):
+            self.key = key
+
+        async def async_load(self):
+            return json.loads(json.dumps(Store.data[self.key])) if self.key in Store.data else None
+
+        def async_delay_save(self, data_func, delay=0):
+            Store.data[self.key] = json.loads(json.dumps(data_func()))
+
+        async def async_save(self, data):
+            Store.data[self.key] = data
+
+        async def async_remove(self):
+            Store.data.pop(self.key, None)
+
+    storage.Store = Store
+
+    selector = _mod("homeassistant.helpers.selector")
+    for name in (
+        "BooleanSelector", "NumberSelector", "NumberSelectorConfig", "SelectSelector",
+        "SelectSelectorConfig", "TextSelector", "TextSelectorConfig",
+    ):
+        setattr(selector, name, lambda *a, _n=name, **k: (_n, a, k))
+    selector.SelectOptionDict = dict
+    selector.NumberSelectorMode = type("NumberSelectorMode", (), {"BOX": "box", "SLIDER": "slider"})
+    selector.SelectSelectorMode = type("SelectSelectorMode", (), {"DROPDOWN": "dropdown", "LIST": "list"})
+    selector.TextSelectorType = type("TextSelectorType", (), {"URL": "url", "PASSWORD": "password", "TEXT": "text"})
+
     uc = _mod("homeassistant.helpers.update_coordinator")
     sub = type("_Sub", (), {"__class_getitem__": classmethod(lambda cls, item: cls)})
-    uc.DataUpdateCoordinator = type("DataUpdateCoordinator", (sub,), {"__init__": lambda s, *a, **k: None})
+
+    class DataUpdateCoordinator(sub):
+        def __init__(self, hass=None, logger=None, *, config_entry=None, name=None, update_interval=None, **kw):
+            self.hass = hass
+            self.config_entry = config_entry
+            self.data = None
+            self._listeners = []
+
+        def async_add_listener(self, update_callback, context=None):
+            self._listeners.append(update_callback)
+            return lambda: self._listeners.remove(update_callback)
+
+        def async_update_listeners(self):
+            for listener in list(self._listeners):
+                listener()
+
+        def async_set_updated_data(self, data):
+            self.data = data
+            self.async_update_listeners()
+
+    uc.DataUpdateCoordinator = DataUpdateCoordinator
     uc.UpdateFailed = type("UpdateFailed", (Exception,), {})
     uc.CoordinatorEntity = type(
         "CoordinatorEntity", (sub,), {"__init__": lambda s, coord: setattr(s, "coordinator", coord)}
@@ -66,15 +182,26 @@ def _install_ha_stubs() -> None:
     dr = _mod("homeassistant.helpers.device_registry")
     dr.DeviceEntryType = type("DeviceEntryType", (), {"SERVICE": "service"})
     dr.DeviceInfo = lambda **k: k
+    dr.async_get = lambda hass: hass.device_registry
+    helpers.device_registry = dr
+    er = _mod("homeassistant.helpers.entity_registry")
+    er.async_get = lambda hass: hass.entity_registry
+    er.async_entries_for_config_entry = lambda reg, entry_id: [
+        e for e in reg.entries if e.config_entry_id == entry_id
+    ]
+    helpers.entity_registry = er
     _mod("homeassistant.helpers.entity_platform").AddEntitiesCallback = object
 
     util = _mod("homeassistant.util")
     dt = _mod("homeassistant.util.dt")
     dt._now = DEFAULT_NOW
+    dt.UTC = timezone.utc
     dt.DEFAULT_TIME_ZONE = AMS
     dt.parse_datetime = lambda s: datetime.fromisoformat(s.replace("Z", "+00:00"))
     dt.now = lambda: dt._now
+    dt.utcnow = lambda: dt._now.astimezone(timezone.utc)
     dt.as_local = lambda d: d.astimezone(AMS)
+    dt.as_utc = lambda d: d.astimezone(timezone.utc)
     util.dt = dt
 
     _mod("homeassistant.components")
@@ -89,10 +216,12 @@ def _install_ha_stubs() -> None:
         state_class: object = None
         native_unit_of_measurement: str | None = None
         suggested_display_precision: int | None = None
+        entity_category: object = None
 
     sensor.SensorEntityDescription = SensorEntityDescription
     sensor.SensorEntity = object
     sensor.SensorStateClass = type("SensorStateClass", (), {"MEASUREMENT": "measurement"})
+    sensor.SensorDeviceClass = type("SensorDeviceClass", (), {"TIMESTAMP": "timestamp"})
 
     binary = _mod("homeassistant.components.binary_sensor")
 
