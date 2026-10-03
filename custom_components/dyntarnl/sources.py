@@ -31,6 +31,7 @@ from .const import (
     GROUP_TAX,
 )
 from .model import EnergyData, PriceData, Slot, bucket_by_day, parse_dt
+from .prices import Tariff, apply_formula
 
 _TIMEOUT = aiohttp.ClientTimeout(total=30)
 _UNIT_MAP = {"kWh": "kWh", "m3": "m³", "m³": "m³"}
@@ -188,28 +189,11 @@ async def build_custom(session: aiohttp.ClientSession, cfg: dict) -> PriceData:
     beursprijs van die bron wordt gebruikt; de opslag/belasting komen van de gebruiker.
     """
     vat = float(cfg.get(CONF_VAT, DEFAULT_VAT))
-    factor = 1 + vat / 100
     base = await _epex_source(session, cfg.get(CONF_EPEX_SOURCE, DEFAULT_EPEX_SOURCE))
     params = {
         ELECTRICITY: (float(cfg.get(CONF_MARKUP_ELEC, 0.0)), float(cfg.get(CONF_TAX_ELEC, 0.0)), "kWh"),
         GAS: (float(cfg.get(CONF_MARKUP_GAS, 0.0)), float(cfg.get(CONF_TAX_GAS, 0.0)), "m³"),
     }
-
-    def to_custom(s: Slot, markup_ex: float, tax_ex: float) -> Slot:
-        subtotal_ex = s.market_ex + markup_ex + tax_ex
-        total = subtotal_ex * factor
-        return Slot(
-            start=s.start,
-            end=s.end,
-            total=round(total, 6),
-            market=round(s.market_ex * factor, 6),
-            market_ex=s.market_ex,
-            fee=round(markup_ex * factor, 6),
-            fee_ex=markup_ex,
-            tax=round(tax_ex * factor, 6),
-            tax_ex=tax_ex,
-            vat=round(total - subtotal_ex, 6),
-        )
 
     result: PriceData = {}
     for energy, (markup_ex, tax_ex, unit) in params.items():
@@ -217,8 +201,10 @@ async def build_custom(session: aiohttp.ClientSession, cfg: dict) -> PriceData:
         if not ed:
             continue
 
+        tariff = Tariff(fee_ex=markup_ex, tax_ex=tax_ex, vat=vat)
+
         def mapped(slots):
-            return [to_custom(s, markup_ex, tax_ex) for s in slots] if slots else None
+            return [apply_formula(s.start, s.end, s.market_ex, tariff) for s in slots] if slots else None
 
         result[energy] = EnergyData(
             unit=unit,
