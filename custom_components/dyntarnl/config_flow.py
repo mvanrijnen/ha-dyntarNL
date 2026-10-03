@@ -230,8 +230,16 @@ class DynTarNLOptionsFlow(OptionsFlow):
         Generiek: elke provider levert zijn eigen velden via `option_fields()`; een
         nieuwe provider hoeft hier niets aan te passen.
         """
-        current = {**self._current(), **(user_input or {})}
-        providers = [PROVIDERS[k](current) for k in current[CONF_FC_PROVIDERS] if k in PROVIDERS]
+        selected = [PROVIDERS[k] for k in self._current()[CONF_FC_PROVIDERS] if k in PROVIDERS]
+        submitted: dict[str, Any] = {}
+        if user_input is not None:
+            # Een leeggemaakt optioneel veld stuurt HA niet mee: dat betekent 'leeg',
+            # niet 'houd de oude waarde'.
+            for cls in selected:
+                for key in cls.option_keys:
+                    submitted[key] = user_input.get(key, FORECAST_DEFAULTS.get(key))
+        current = {**self._current(), **submitted}
+        providers = [cls(current) for cls in selected]
         fields: dict = {}
         for provider in providers:
             fields.update(provider.option_fields())
@@ -245,7 +253,7 @@ class DynTarNLOptionsFlow(OptionsFlow):
                 if provider.option_keys and (error := await provider.async_validate(session)):
                     errors[provider.option_keys[0]] = error
             if not errors:
-                self._options.update(user_input)
+                self._options.update(submitted)
                 return await self.async_step_advanced()
 
         return self.async_show_form(

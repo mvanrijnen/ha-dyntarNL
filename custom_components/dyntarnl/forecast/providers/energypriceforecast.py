@@ -41,7 +41,9 @@ class EnergyPriceForecastProvider(ForecastProvider):
 
     def option_fields(self) -> dict:
         return {
-            vol.Optional(CONF_FC_EPF_API_KEY, default=self.api_key): TextSelector(
+            # suggested_value i.p.v. default: anders vult HA een leeggemaakt veld
+            # weer met de oude key en kun je hem nooit meer weghalen.
+            vol.Optional(CONF_FC_EPF_API_KEY, description={"suggested_value": self.api_key}): TextSelector(
                 TextSelectorConfig(type=TextSelectorType.PASSWORD)
             )
         }

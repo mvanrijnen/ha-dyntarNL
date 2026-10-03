@@ -231,3 +231,16 @@ def test_deselected_provider_entities_are_removed(setup_env):
     stale = [RegEntry("sensor.x", "entry1_forecast_energypriceforecast_mae", "entry1")]
     hass, _, _ = run({**FORECAST_DEFAULTS, CONF_FORECAST: True, CONF_FC_PROVIDERS: [A]}, registry=stale)
     assert hass.entity_registry.removed == ["sensor.x"]
+
+
+def test_api_key_can_be_cleared(no_network):
+    """Een leeggemaakt optioneel veld stuurt HA niet mee; dat moet 'leeg' worden."""
+    flow = _flow({**FORECAST_DEFAULTS, "forecast_energypriceforecast_api_key": "oude-key"})
+    asyncio.run(flow.async_step_init({CONF_FORECAST: True}))
+    form = asyncio.run(flow.async_step_forecast(_general()))
+    key_field = next(k for k in form["data_schema"].schema if k == "forecast_energypriceforecast_api_key")
+    assert key_field.default is None  # geen default die HA weer invult
+
+    asyncio.run(flow.async_step_provider_settings({"forecast_epexpredictor_url": "https://epexpredictor.batzill.com"}))
+    result = asyncio.run(flow.async_step_advanced(dict(ADVANCED)))
+    assert result["data"]["forecast_energypriceforecast_api_key"] == ""
