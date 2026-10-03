@@ -295,4 +295,9 @@ async def async_setup_entry(
             DynTarNLComponentSensor(coordinator, energy, d) for d in _COMPONENT_SENSORS
         )
     entities.extend(DynTarNLFeedInSensor(coordinator, d) for d in _FEEDIN_SENSORS)
+    if coordinator.forecast is not None:
+        # Alleen als de voorspel-optie aan staat; anders exact de oude set.
+        from .forecast.sensor import forecast_entities
+
+        entities.extend(forecast_entities(coordinator.forecast))
     async_add_entities(entities)

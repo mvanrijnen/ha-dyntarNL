@@ -80,6 +80,8 @@ class DynTarNLCoordinator(DataUpdateCoordinator[PriceData]):
         )
         self._session = async_get_clientsession(hass)
         self.supplier = supplier_by_key(entry.data.get(CONF_SUPPLIER, ""))
+        # Optionele voorspel-coordinator (forecast/coordinator.py); None = uit.
+        self.forecast = None
 
     async def _async_update_data(self) -> PriceData:
         supplier = self.supplier

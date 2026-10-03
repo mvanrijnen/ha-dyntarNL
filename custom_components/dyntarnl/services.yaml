@@ -1,1 +1,27 @@
 refresh:
+
+get_prices:
+  fields:
+    energy:
+      default: electricity
+      selector:
+        select:
+          options:
+            - electricity
+            - gas
+    include_forecast:
+      default: true
+      selector:
+        boolean:
+    provider:
+      default: ensemble
+      example: ensemble
+      selector:
+        text:
+    horizon:
+      example: 72
+      selector:
+        number:
+          min: 1
+          max: 168
+          unit_of_measurement: h

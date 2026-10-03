@@ -1,0 +1,153 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "DynTarNL — kies je leverancier",
+        "description": "Kies je energieleverancier. De integratie bepaalt zelf welk platform en welke prijs-API erbij hoort. Staat je leverancier er niet tussen? Kies dan 'Custom supplier (manual)'.",
+        "data": {
+          "supplier": "Leverancier"
+        }
+      },
+      "custom": {
+        "title": "Eigen leverancier",
+        "description": "Handig voor leveranciers zonder publieke API, zoals Vattenfall, Eneco, Tibber, Greenchoice, Zonneplan, ENGIE, DELTA, Vandebron, OXXIO en anderen.\n\nDe integratie haalt de kale EPEX-beursprijs op en rekent de all-in prijs zelf uit. Vul je tarieven exclusief btw in; de btw komt erbovenop.\n\nall-in = (EPEX + opslag + energiebelasting) × (1 + btw%)",
+        "data": {
+          "vat_percentage": "Btw (%)",
+          "markup_electricity": "Opslag stroom (€/kWh, excl. btw)",
+          "markup_gas": "Opslag gas (€/m³, excl. btw)",
+          "energy_tax_electricity": "Energiebelasting stroom (€/kWh, excl. btw)",
+          "energy_tax_gas": "Energiebelasting gas (€/m³, excl. btw)",
+          "epex_source": "Bron EPEX-beursprijs"
+        },
+        "data_description": {
+          "epex_source": "Waar de kale beursprijs vandaan komt. Voor stroom is die overal gelijk; voor gas verschilt hij licht per bron. Twijfel je? Laat easyEnergy staan."
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Deze leverancier is al ingesteld."
+    }
+  },
+  "selector": {
+    "epex_source": {
+      "options": {
+        "easyenergy": "easyEnergy (standaard)",
+        "energyzero": "EnergyZero",
+        "frank": "Frank Energie",
+        "essent": "Essent"
+      }
+    },
+    "forecast_provider": {
+      "options": {
+        "epexpredictor": "EpexPredictor",
+        "energypriceforecast": "Energy Price Forecast EU"
+      }
+    },
+    "forecast_weighting": {
+      "options": {
+        "accuracy": "Automatisch, op nauwkeurigheid",
+        "equal": "Gelijk"
+      }
+    },
+    "forecast_weight_exponent": {
+      "options": {
+        "1": "1/MAE",
+        "2": "1/MAE² (beloont nauwkeurigheid sterker)"
+      }
+    }
+  },
+  "services": {
+    "refresh": {
+      "name": "Tarieven verversen",
+      "description": "Haalt de dynamische tarieven direct opnieuw op."
+    },
+    "get_prices": {
+      "name": "Prijzen ophalen",
+      "description": "Geeft de volledige prijsreeks terug (gepubliceerde prijzen, optioneel aangevuld met voorspellingen) als response data. Stroom per kwartier, gas per gasdag.",
+      "fields": {
+        "energy": {
+          "name": "Energie",
+          "description": "electricity of gas (gas: alleen gepubliceerde prijzen)."
+        },
+        "include_forecast": {
+          "name": "Inclusief voorspelling",
+          "description": "Aanvullen met voorspellingen (alleen als de voorspel-optie aan staat)."
+        },
+        "provider": {
+          "name": "Bron",
+          "description": "ensemble (standaard), één bron (epexpredictor, energypriceforecast) of all (geeft ook elke bronreeks apart terug)."
+        },
+        "horizon": {
+          "name": "Horizon",
+          "description": "Alleen kwartieren tot zoveel uur vanaf nu."
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Prijsvoorspellingen",
+        "description": "Vul de gepubliceerde day-ahead prijzen optioneel aan met EPEX-prijsvoorspellingen uit externe bronnen, tot 7 dagen vooruit. Standaard uit: staat dit uit, dan verandert er niets (geen extra API-calls, geen extra entiteiten).",
+        "data": {
+          "forecast_enabled": "Prijsvoorspellingen aanzetten"
+        }
+      },
+      "forecast": {
+        "title": "Instellingen voorspellingen",
+        "description": "Voorspellingen worden altijd als kale EPEX-prijs opgehaald; de formule van je leverancier (opslag, energiebelasting, btw) past DynTarNL zelf toe. Gepubliceerde prijzen winnen altijd van een voorspelling.",
+        "data": {
+          "forecast_providers": "Bronnen",
+          "forecast_ensemble": "Bronnen combineren (ensemble)",
+          "forecast_weighting": "Weging",
+          "forecast_weight_exponent": "Gewicht naar",
+          "forecast_accuracy": "Nauwkeurigheid meten",
+          "forecast_horizon_hours": "Maximale horizon",
+          "forecast_interval_hours": "Ophaalinterval"
+        },
+        "data_description": {
+          "forecast_ensemble": "Uit = alleen de afzonderlijke bronreeksen; de sensoren gebruiken dan de eerste bron in de lijst die een waarde heeft.",
+          "forecast_weighting": "Automatisch = bronnen die nauwkeuriger bleken wegen zwaarder. Vereist nauwkeurigheidsmeting.",
+          "forecast_accuracy": "Vergelijkt elke voorspelling met de prijs die later gepubliceerd wordt. Nodig voor automatische weging en de verwachte fout.",
+          "forecast_horizon_hours": "Energy Price Forecast EU levert zonder API-key maximaal 48 uur (met key 120 uur); EpexPredictor ongeveer 7 dagen.",
+          "forecast_interval_hours": "Hoe vaak elke bron wordt bevraagd. Het zijn gratis diensten: een paar keer per dag is ruim voldoende."
+        }
+      },
+      "provider_settings": {
+        "title": "Instellingen per bron",
+        "description": "Instellingen van de gekozen bronnen. Ze worden met één testcall gecontroleerd.",
+        "data": {
+          "forecast_epexpredictor_url": "EpexPredictor-URL",
+          "forecast_energypriceforecast_api_key": "Energy Price Forecast EU API-key (optioneel)"
+        },
+        "data_description": {
+          "forecast_epexpredictor_url": "Publieke instantie of je eigen (bijv. een lokale container of add-on).",
+          "forecast_energypriceforecast_api_key": "Zonder key is de horizon maximaal 48 uur."
+        }
+      },
+      "advanced": {
+        "title": "Geavanceerd",
+        "data": {
+          "forecast_min_samples": "Minimum afgerekende kwartieren vóór weging",
+          "forecast_weight_floor": "Minimumgewicht per bron",
+          "forecast_bias_correction": "Biascorrectie",
+          "forecast_window_days": "Meetvenster",
+          "forecast_cheapest_hours": "Lengte goedkoopste blok"
+        },
+        "data_description": {
+          "forecast_min_samples": "Tot elke bron zoveel afgerekende kwartieren heeft, wegen alle bronnen even zwaar (96 = één dag).",
+          "forecast_weight_floor": "Aandeel (0–0,5) dat een bron altijd houdt, zodat hij zich na een slechte periode kan terugverdienen.",
+          "forecast_bias_correction": "Trek de gemeten systematische fout per bron af vóór het middelen.",
+          "forecast_window_days": "Over zoveel recente dagen wordt de nauwkeurigheid gemeten.",
+          "forecast_cheapest_hours": "Voor de sensor 'cheapest block start' (komende 48 uur, inclusief voorspellingen)."
+        }
+      }
+    },
+    "error": {
+      "no_providers": "Kies minstens één bron.",
+      "weighting_needs_accuracy": "Automatische weging vereist dat nauwkeurigheidsmeting aan staat.",
+      "cannot_connect": "Deze bron is niet bereikbaar.",
+      "invalid_api_key": "De API-key is afgewezen."
+    }
+  }
+}

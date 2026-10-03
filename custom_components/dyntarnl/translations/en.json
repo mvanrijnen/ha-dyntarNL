@@ -36,12 +36,118 @@
         "frank": "Frank Energie",
         "essent": "Essent"
       }
+    },
+    "forecast_provider": {
+      "options": {
+        "epexpredictor": "EpexPredictor",
+        "energypriceforecast": "Energy Price Forecast EU"
+      }
+    },
+    "forecast_weighting": {
+      "options": {
+        "accuracy": "Automatic, by accuracy",
+        "equal": "Equal"
+      }
+    },
+    "forecast_weight_exponent": {
+      "options": {
+        "1": "1/MAE",
+        "2": "1/MAE² (rewards accuracy more)"
+      }
     }
   },
   "services": {
     "refresh": {
       "name": "Refresh tariffs",
       "description": "Fetches the dynamic tariffs again right away."
+    },
+    "get_prices": {
+      "name": "Get prices",
+      "description": "Returns the full price series (published prices, optionally extended with forecasts) as response data. Electricity per quarter hour, gas per gas day.",
+      "fields": {
+        "energy": {
+          "name": "Energy",
+          "description": "electricity or gas (gas: published prices only)."
+        },
+        "include_forecast": {
+          "name": "Include forecast",
+          "description": "Extend with forecasts (only when the forecast option is on)."
+        },
+        "provider": {
+          "name": "Source",
+          "description": "ensemble (default), a single source (epexpredictor, energypriceforecast) or all (also returns each source series separately)."
+        },
+        "horizon": {
+          "name": "Horizon",
+          "description": "Only quarters up to this many hours from now."
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Price forecasts",
+        "description": "Optionally extend the published day-ahead prices with EPEX price forecasts from external sources, up to 7 days ahead. Off by default: when off, nothing changes (no extra API calls, no extra entities).",
+        "data": {
+          "forecast_enabled": "Enable price forecasts"
+        }
+      },
+      "forecast": {
+        "title": "Forecast settings",
+        "description": "Forecasts are always fetched as the bare EPEX price; your supplier's formula (markup, energy tax, VAT) is applied by DynTarNL. Published prices always win over forecasts.",
+        "data": {
+          "forecast_providers": "Sources",
+          "forecast_ensemble": "Combine sources (ensemble)",
+          "forecast_weighting": "Weighting",
+          "forecast_weight_exponent": "Weight by",
+          "forecast_accuracy": "Measure accuracy",
+          "forecast_horizon_hours": "Maximum horizon",
+          "forecast_interval_hours": "Fetch interval"
+        },
+        "data_description": {
+          "forecast_ensemble": "Off = only the separate source series; sensors then use the first source in the list that has a value.",
+          "forecast_weighting": "Automatic = sources that turned out more accurate weigh more. Requires accuracy measurement.",
+          "forecast_accuracy": "Compares every forecast with the price that is published later. Needed for automatic weighting and the expected error.",
+          "forecast_horizon_hours": "Energy Price Forecast EU delivers at most 48 h without an API key (120 h with one); EpexPredictor about 7 days.",
+          "forecast_interval_hours": "How often each source is asked. These are free services: a few times a day is plenty."
+        }
+      },
+      "provider_settings": {
+        "title": "Source settings",
+        "description": "Settings per selected source. They are checked with one test call.",
+        "data": {
+          "forecast_epexpredictor_url": "EpexPredictor URL",
+          "forecast_energypriceforecast_api_key": "Energy Price Forecast EU API key (optional)"
+        },
+        "data_description": {
+          "forecast_epexpredictor_url": "Public instance or your own (e.g. a local container or add-on).",
+          "forecast_energypriceforecast_api_key": "Without a key the horizon is at most 48 hours."
+        }
+      },
+      "advanced": {
+        "title": "Advanced",
+        "data": {
+          "forecast_min_samples": "Minimum settled quarters before weighting",
+          "forecast_weight_floor": "Minimum weight per source",
+          "forecast_bias_correction": "Bias correction",
+          "forecast_window_days": "Measurement window",
+          "forecast_cheapest_hours": "Length of the cheapest block"
+        },
+        "data_description": {
+          "forecast_min_samples": "Until every source has this many settled quarters, all sources weigh the same (96 = one day).",
+          "forecast_weight_floor": "Share (0–0.5) a source always keeps, so it can earn back its weight after a bad period.",
+          "forecast_bias_correction": "Subtract each source's measured systematic error before averaging.",
+          "forecast_window_days": "Accuracy is measured over this many most recent days.",
+          "forecast_cheapest_hours": "Used by the 'cheapest block start' sensor (next 48 hours, forecasts included)."
+        }
+      }
+    },
+    "error": {
+      "no_providers": "Select at least one source.",
+      "weighting_needs_accuracy": "Automatic weighting needs accuracy measurement turned on.",
+      "cannot_connect": "Could not reach this source.",
+      "invalid_api_key": "The API key was rejected."
     }
   }
 }
