@@ -147,6 +147,17 @@ def _install_ha_stubs() -> None:
     ):
         setattr(selector, name, lambda *a, _n=name, **k: (_n, a, k))
     selector.SelectOptionDict = dict
+
+    def _strict_config(**k):
+        # Zoals HA: een selector-config met None-waarden is ongeldig.
+        bad = [key for key, value in k.items() if value is None]
+        if bad:
+            raise ValueError(f"selector-config met None: {bad}")
+        return dict(k)
+
+    selector.NumberSelectorConfig = _strict_config
+    selector.SelectSelectorConfig = _strict_config
+    selector.TextSelectorConfig = _strict_config
     selector.NumberSelectorMode = type("NumberSelectorMode", (), {"BOX": "box", "SLIDER": "slider"})
     selector.SelectSelectorMode = type("SelectSelectorMode", (), {"DROPDOWN": "dropdown", "LIST": "list"})
     selector.TextSelectorType = type("TextSelectorType", (), {"URL": "url", "PASSWORD": "password", "TEXT": "text"})
