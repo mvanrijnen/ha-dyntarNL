@@ -14,7 +14,7 @@ Everything the user sees (README, `strings.json`) plus most code comments/docstr
 ## Commands
 
 ```bash
-pytest                 # full suite (~30 tests, no HA install, no network)
+pytest                 # full suite (~115 tests, no HA install, no network)
 pytest tests/test_sources.py::test_frank_parser -q            # single test
 pytest -k gasday
 ```
@@ -52,7 +52,10 @@ Data flows: **supplier registry → platform fetcher → shared `Slot` model →
   an existing platform is a one-line change here. All config keys and API URLs live here too.
 - `sources.py` — one `fetch_*` coroutine per platform (`fetch_eon_app`, `fetch_easyenergy`,
   `fetch_frank`, `fetch_energyzero`) plus `build_custom`. Each normalises a vendor payload
-  into `list[Slot]` and returns `PriceData`. This is the only module that talks to the network.
+  into `list[Slot]` and returns `PriceData`. Together with `forecast/providers/` the only code
+  that talks to the network.
+- `prices.py` — `apply_formula(market_ex, Tariff)` is *the* supplier formula
+  (`(market + fee + tax) × (1 + vat)`), used by CUSTOM and by forecasts. Don't add a second one.
 - `model.py` — `Slot` (one hour: `total`/`market`/`fee`/`tax`, each with an `_ex` excl.-VAT
   twin) and `bucket_by_day()`, which splits a flat slot list into yesterday/today/tomorrow by
   *local* date. `PriceData = dict[str, EnergyData]` keyed by `ELECTRICITY`/`GAS`.
@@ -62,8 +65,19 @@ Data flows: **supplier registry → platform fetcher → shared `Slot` model →
   description tuples (`_METRICS × _BASES`, `_COMPONENTS`, `_FEEDIN_SENSORS`, `_BINARY_SENSORS`)
   rather than written out one by one. Adding a metric = adding a tuple entry + a small pure
   function taking `(EnergyData, datetime, PriceFn)`.
-- `__init__.py` — owns *when* data is fetched (see below) and registers the `dyntarnl.refresh`
-  service.
+- `__init__.py` — owns *when* data is fetched (see below), registers the `dyntarnl.refresh`
+  and `dyntarnl.get_prices` services, and migrates config entries (1.1 → 1.2).
+- `config_flow.py` — supplier choice plus an options flow that only holds the forecast options.
+- `forecast/` — optional EPEX forecasts (off by default; `CONF_FORECAST`). Electricity only,
+  per quarter hour, internally UTC:
+  - `providers/` — one `ForecastProvider` subclass per source, registered in `PROVIDERS`. A new
+    source = one class + one registry line + translations; options flow and engine are generic.
+  - `engine.py` merges published (always wins) with forecasts; `ensemble.py` weights;
+    `accuracy.py` snapshots + settles against published hours (raw prices, 28-day window of
+    daily aggregates); `views.py` feeds the service and the compact sensors.
+  - `coordinator.py` — its own coordinator, its own timer (15-min tick, fetches only when a
+    series is older than the interval), per-provider timeout + backoff, persisted in a `Store`.
+    It listens to the price coordinator and never the other way round.
 
 ### Invariants worth knowing
 
@@ -83,6 +97,11 @@ Data flows: **supplier registry → platform fetcher → shared `Slot` model →
   exporting costs money. Sources without a real markup (`fee = 0`) collapse this to `market < 0`.
 - **Unique IDs** are `{entry_id}_{energy}_{...}` and entity names are compact English
   (`e_all_in_now`). Changing either renames user entities — a breaking change.
+- **Forecast off = exactly the old behaviour**: no extra timers, tasks, calls or entities
+  (`test_off_is_exactly_the_old_behaviour` guards it). Forecast data never enters the price
+  coordinator's `data`, and a forecast failure must never propagate into the price path.
+  Forecast unique IDs contain `_forecast_`; setup removes the ones the current options don't
+  produce.
 
 ### Adding a new supplier
 

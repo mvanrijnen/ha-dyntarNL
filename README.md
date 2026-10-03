@@ -105,6 +105,7 @@ Bijv. `sensor.dyntarnl_e_all_in_now`, `sensor.dyntarnl_g_market_today_avg`.
 | --- | --- |
 | `button.dyntarnl_refresh` (via `button.press`) | Knop op de device-pagina; verse data ophalen |
 | **`dyntarnl.refresh`** | Service — overal aanroepbaar, ververst de tarieven direct |
+| **`dyntarnl.get_prices`** | Service met response data — de volledige prijsreeks, optioneel met voorspellingen (zie [Prijsvoorspellingen](#prijsvoorspellingen-optioneel)) |
 
 ```yaml
 # overal aanroepbaar, bijv. in een automatisering of script:
@@ -290,6 +291,124 @@ De prijs-*array* verandert maar een paar keer per dag, dus de integratie is zuin
   netwerk-call, puur uit de cache.
 - **Handmatig:** de knop **"Refresh"** (`button.dyntarnl_refresh`, op de device-pagina,
   onder Configuratie). Die kun je ook vanuit automatiseringen aanroepen via `button.press`.
+
+## Prijsvoorspellingen (optioneel)
+
+Vanaf 2.0 kan DynTarNL de gepubliceerde day-ahead prijzen aanvullen met **voorspellingen tot
+7 dagen vooruit**. De optie staat **standaard uit**. Zolang hij uit staat verandert er niets:
+geen extra API-calls, geen extra entiteiten en geen andere sensoren of attributen.
+
+**Aanzetten:** *Instellingen → Apparaten & Services → DynTarNL → Configureren*. Dat kan op elk
+moment, zonder de integratie opnieuw toe te voegen.
+
+### Hoe het werkt
+
+- **Bronnen** (meer kunnen later worden toegevoegd):
+  - [EpexPredictor](https://github.com/b3nn0/EpexPredictor), regio NL, ongeveer 7 dagen
+    vooruit. De URL is instelbaar, zodat je ook een eigen instantie kunt gebruiken (lokale
+    container of add-on).
+  - [Energy Price Forecast EU](https://energypriceforecast.eu), markt NL. Zonder API-key
+    maximaal 48 uur, met (optionele) key tot 120 uur.
+- **Altijd de kale EPEX-prijs.** De opslag- en btw-opties van de bronnen worden niet gebruikt.
+  DynTarNL past er de formule van jouw leverancier op toe, met **exact dezelfde functie** als
+  voor CUSTOM:
+
+  ```text
+  all-in = (EPEX + opslag + energiebelasting) × (1 + btw%)
+  ```
+
+  Opslag, energiebelasting en btw komen uit het laatst gepubliceerde uur van je leverancier.
+  Negatieve prijzen gaan lineair mee, net als bij de leveranciers zelf.
+- **Gepubliceerd wint altijd.** Een voorspelling vult alleen kwartieren in waarvoor (nog) geen
+  echte prijs is. Zodra de day-ahead binnenkomt vervangt die de voorspelling. Day-ahead-waarden
+  die een bron zelf meelevert worden genegeerd: "gepubliceerd" komt altijd van je leverancier.
+- **Per kwartier.** Gepubliceerde uurprijzen en voorspelde uurwaarden worden over vier
+  kwartieren verdeeld en als `expanded` gemarkeerd.
+- **Alleen stroom.** Geen van de bronnen voorspelt gas.
+
+### Ensemble en nauwkeurigheid
+
+- **Ensemble:** per kwartier een gewogen gemiddelde van de bronnen die voor dat kwartier een
+  waarde hebben. Heeft maar één bron een waarde, dan wordt die gebruikt (`n_sources = 1`). De
+  losse bronreeksen blijven ook beschikbaar.
+- **Weging:** "gelijk", of "automatisch op nauwkeurigheid".
+  - Bij automatisch is het gewicht ~ 1/MAE (of 1/MAE²) per looptijd-bucket: 0–1 dag,
+    2–3 dagen en 4–7 dagen.
+  - Zolang een bron te weinig afgerekende kwartieren heeft (standaard 96, één dag) wegen alle
+    bronnen even zwaar.
+  - Elke bron houdt een minimumgewicht (standaard 10%), zodat hij na een slechte periode niet
+    wegvalt.
+  - Optioneel: **biascorrectie**. Dan wordt de gemeten systematische fout per bron eerst
+    afgetrokken.
+- **Nauwkeurigheidsmeting:**
+  - Elke opgehaalde voorspelling wordt bewaard en afgerekend zodra de echte prijs binnenkomt.
+  - Dat gebeurt altijd op kale prijzen, want opslag en belasting voegen geen onzekerheid toe.
+  - De leverancier publiceert per uur, dus een uur wordt afgerekend als het gemiddelde van
+    zijn vier voorspelde kwartieren.
+  - **Venster:** de laatste 28 dagen (instelbaar). Het ensemble wordt per bucket én per aantal
+    bijdragende bronnen afgerekend. Of meer bronnen echt helpen wordt dus gemeten, niet
+    aangenomen.
+  - **Uitschieters** zijn begrensd op 0,15 €/kWh per kwartier.
+- **Verwachte fout** per voorspeld kwartier: `√(MAE² + (spreiding/2)²)`.
+  - MAE is de gemeten ensemble-fout voor deze looptijd en dit aantal bronnen.
+  - De spreiding is het verschil tussen de bronnen nu.
+  - All-in = kale marge × btw-factor.
+- **Opslag:** de gegevens staan in HA-storage (`.storage/dyntarnl.forecast_<entry>`) en
+  overleven een herstart. Ruwe voorspellingen blijven alleen bewaard tot ze zijn afgerekend;
+  daarna alleen dag-totalen binnen het venster.
+
+### Ophalen en fair use
+
+Elke bron wordt standaard **eens per 6 uur** bevraagd (instelbaar van 2 tot 24 uur). De
+voorspellingen hebben een eigen coordinator met eigen time-outs (20 s) en een oplopende
+wachttijd na fouten (30 min → 12 uur). **Een storing bij een voorspelbron heeft nooit invloed
+op het ophalen of tonen van de gepubliceerde prijzen.**
+
+### Entiteiten (alleen als de optie aan staat)
+
+| Entiteit | Wat |
+| --- | --- |
+| `sensor.dyntarnl_e_cheapest_block_start` | Start van het goedkoopste aaneengesloten blok van N uur (standaard 3) in de komende 48 uur, inclusief voorspellingen. Attributen: `end`, `avg_price_allin`, `source` (`published`/`forecast`/`mixed`), `expected_error_allin` |
+| `sensor.dyntarnl_e_all_in_forecast_avg` | Gemiddelde all-in prijs over de komende 24 uur. Draagt de volledige reeks `prices` (`[epoch-ms, all-in, "p"\|"f"]`) en `error_band` voor grafieken. Die attributen worden **niet** in de recorder opgeslagen |
+| `sensor.dyntarnl_e_tomorrow_avg_forecast` | Gemiddelde all-in van morgen: gepubliceerd als dat er is, anders voorspeld (met `source`) |
+| `sensor.dyntarnl_forecast_<bron>_mae` / `_bias` / `_settled` / `_weight` / `_last_fetch` | Diagnostiek per bron: gemeten fout, systematische fout, aantal afgerekende kwartieren, huidig gewicht en ophaalstatus |
+| `sensor.dyntarnl_forecast_ensemble_mae` / `_settled` | Gemeten fout van het ensemble, per bucket en per aantal bronnen |
+
+Zet je de optie uit (of een bron), dan worden de bijbehorende entiteiten automatisch opgeruimd.
+
+### Service `dyntarnl.get_prices`
+
+De belangrijkste manier om volledige reeksen op te halen. Werkt ook met de optie uit; dan
+krijg je alleen gepubliceerde prijzen terug.
+
+```yaml
+action: dyntarnl.get_prices
+data:
+  energy: electricity        # of gas (alleen gepubliceerd, per gasdag)
+  include_forecast: true
+  provider: ensemble         # of epexpredictor / energypriceforecast / all
+  horizon: 72                # uren vanaf nu (optioneel)
+response_variable: prijzen
+```
+
+Elk record heeft de velden:
+
+- `start`, `end`, `price_raw` (kaal, excl. btw), `price_allin`, `source`, `expanded`
+- bij gepubliceerde prijzen: `supplier`
+- bij voorspellingen: `providers`, `fetched_at`, `n_sources`, `spread_min`, `spread_max`,
+  `expected_error_raw` en `expected_error_allin`
+
+### Beperkingen
+
+- **Alle bronnen gebruiken dezelfde weerdata** (wind, zon, temperatuur). Hun fouten zijn dus
+  gecorreleerd: als het weerbericht ernaast zit, zitten ze er vaak allemaal naast. Het
+  ensemble middelt modelverschillen uit, geen weersonzekerheid. De gemeten fout per aantal
+  bronnen laat zien hoeveel het in de praktijk scheelt.
+- Een voorspelling over 1 januari heen rekent nog met de energiebelasting van het oude jaar.
+- Een voorspelling blijft een voorspelling. Gebruik hem om te plannen, niet om af te rekenen.
+- Energy Price Forecast EU heeft geen gedocumenteerde publieke API-spec. DynTarNL gebruikt
+  het endpoint van hun eigen HA-integratie en controleert het antwoordformaat. Verandert dat,
+  dan gaat alleen die bron in storing.
 
 ## Installatie (HACS)
 
