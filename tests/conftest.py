@@ -173,6 +173,12 @@ def _install_ha_stubs() -> None:
             self.data = data
             self.async_update_listeners()
 
+        async def async_config_entry_first_refresh(self):
+            self.data = await self._async_update_data()
+
+        async def async_request_refresh(self):
+            self.async_set_updated_data(await self._async_update_data())
+
     uc.DataUpdateCoordinator = DataUpdateCoordinator
     uc.UpdateFailed = type("UpdateFailed", (Exception,), {})
     uc.CoordinatorEntity = type(
@@ -238,6 +244,13 @@ def _install_ha_stubs() -> None:
 
 _install_ha_stubs()
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components"))
+
+
+@pytest.fixture(autouse=True)
+def _clean_store():
+    """Elke test begint met een lege (gestubde) HA Store."""
+    sys.modules["homeassistant.helpers.storage"].Store.data.clear()
+    yield
 
 
 @pytest.fixture
