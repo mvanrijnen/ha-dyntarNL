@@ -298,6 +298,9 @@ Vanaf 2.0 kan DynTarNL de gepubliceerde day-ahead prijzen aanvullen met **voorsp
 7 dagen vooruit**. De optie staat **standaard uit**. Zolang hij uit staat verandert er niets:
 geen extra API-calls, geen extra entiteiten en geen andere sensoren of attributen.
 
+> 📖 De volledige uitleg (alle opties, de berekeningen, de grafiek en problemen oplossen) staat
+> in [docs/voorspellingen.md](docs/voorspellingen.md).
+
 **Aanzetten:** *Instellingen → Apparaten & Services → DynTarNL → Configureren*. Dat kan op elk
 moment, zonder de integratie opnieuw toe te voegen.
 

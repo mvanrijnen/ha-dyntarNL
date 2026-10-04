@@ -75,6 +75,8 @@ bestaande sensoren, attributen of `entity_id`'s.
 
 ### Overig
 
+- Een nieuwe documentatiepagina [docs/voorspellingen.md](docs/voorspellingen.md) legt de
+  voorspellingen, alle opties, de berekeningen en de grafiek uit.
 - Een config entry gaat van versie 1.1 naar 1.2 en migreert automatisch: de nieuwe opties
   krijgen hun standaardwaarde (uit). Het is een minor-versie, dus terug naar 1.x kan zonder de
   integratie opnieuw toe te voegen.
