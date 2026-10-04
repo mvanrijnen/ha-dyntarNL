@@ -68,6 +68,9 @@ Data flows: **supplier registry → platform fetcher → shared `Slot` model →
 - `__init__.py` — owns *when* data is fetched (see below), registers the `dyntarnl.refresh`
   and `dyntarnl.get_prices` services, and migrates config entries (1.1 → 1.2).
 - `config_flow.py` — supplier choice plus an options flow that only holds the forecast options.
+- `ev.py` / `ev_sensor.py` — optional EV charging cost (`CONF_EV_SENSOR`, empty = off). Books
+  a kWh counter or a power sensor per quarter at the all-in price; per-session contributions
+  are kept so `delete_ev_session` can subtract a session from every period.
 - `forecast/` — optional EPEX forecasts (off by default; `CONF_FORECAST`). Electricity only,
   per quarter hour, internally UTC:
   - `providers/` — one `ForecastProvider` subclass per source, registered in `PROVIDERS`. A new

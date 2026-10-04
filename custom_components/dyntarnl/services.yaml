@@ -46,6 +46,6 @@ delete_ev_session:
   fields:
     session_id:
       default: last
-      example: "2026-10-04T13:30"
+      example: "2026-10-04 18:05"
       selector:
         text:

@@ -529,6 +529,20 @@ Elk record heeft de velden:
   het endpoint van hun eigen HA-integratie en controleert het antwoordformaat. Verandert dat,
   dan gaat alleen die bron in storing.
 
+## Laadkosten EV (optioneel)
+
+DynTarNL kan ook bijhouden wat het laden van je EV kost. Elke geladen kWh wordt afgerekend
+tegen de all-in prijs van dát moment.
+
+- **Aanzetten:** *Configureren → Laadkosten EV*, en kies de sensor van je lader. Dat kan een
+  kWh-teller zijn (per sessie of totaal) of een vermogen-sensor.
+- **Sensoren:** kosten per sessie, dag, maand, kwartaal, jaar en totaal. Elke sensor heeft
+  ook de geladen kWh en de gemiddelde prijs per kWh.
+- **Services:** `dyntarnl.reset_ev_cost` om te resetten, en `dyntarnl.delete_ev_session`
+  om een sessie te verwijderen, bijvoorbeeld van een andere auto.
+
+📖 Uitleg en een complete dashboardkaart: [docs/laadkosten.md](docs/laadkosten.md).
+
 ## Installatie (HACS)
 
 **Snel — via de knop** (vereist dat HACS al geïnstalleerd is):

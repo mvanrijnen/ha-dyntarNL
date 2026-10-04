@@ -293,7 +293,7 @@ def test_delete_after_reset_does_not_subtract_twice():
 def test_unknown_session_is_an_error():
     m, _ = _two_sessions()
     with pytest.raises(ValueError):
-        m.delete_session("1999-01-01T00:00")
+        m.delete_session("1999-01-01 00:00")
 
 
 def test_session_list_survives_restart():

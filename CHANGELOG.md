@@ -3,6 +3,25 @@
 Alle noemenswaardige wijzigingen. Versies volgen [semver](https://semver.org/lang/nl/);
 oudere versies staan op de [releases-pagina](https://github.com/mvanrijnen/ha-dyntarNL/releases).
 
+## 2.1.0 (nog niet uitgebracht)
+
+### Nieuw: laadkosten EV (optioneel)
+
+- De options flow begint nu met een menu: **Prijsvoorspellingen** of **Laadkosten EV**.
+- **Laadkosten EV:** kies de sensor van je lader. Dat kan een kWh-teller zijn (per sessie of
+  totaal) of een vermogen-sensor (W/kW).
+  - Elke geladen kWh wordt per kwartier afgerekend tegen de all-in prijs van dat moment.
+  - Leeg laten betekent uit. Dan verandert er niets.
+- **Nieuwe sensoren** op het device *DynTarNL EV*:
+  - `sensor.dyntarnl_ev_cost_session`, `_today`, `_month`, `_quarter`, `_year` en `_total`;
+  - elk met de geladen kWh, de gemiddelde prijs per kWh en `last_reset`, zodat de
+    langetermijnstatistieken kloppen.
+- **Nieuwe services:**
+  - `dyntarnl.reset_ev_cost` (per periode of alles);
+  - `dyntarnl.delete_ev_session`, die een sessie (bijvoorbeeld een andere auto) van alle
+    tellers aftrekt.
+- **Uitleg** en een complete dashboardkaart staan in [docs/laadkosten.md](docs/laadkosten.md).
+
 ## 2.0.0
 
 **Bestaand gedrag blijft ongewijzigd zolang de nieuwe voorspel-optie uit staat**, en die staat

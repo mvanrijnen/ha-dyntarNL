@@ -84,7 +84,8 @@ MAX_SESSIONS = 100
 
 def _session(start: str | None) -> dict:
     return {
-        "id": start[:16] if start else None,   # bijv. "2026-10-04T13:30"
+        # Lokale starttijd als id, bijv. "2026-10-04 18:05" (zo staat hij ook op de kaart).
+        "id": dt_util.as_local(dt_util.parse_datetime(start)).strftime("%Y-%m-%d %H:%M") if start else None,
         "start": start,
         "end": None,
         "excluded": False,                      # verwijderd terwijl hij nog liep
