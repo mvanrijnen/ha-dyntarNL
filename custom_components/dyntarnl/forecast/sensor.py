@@ -27,7 +27,7 @@ from homeassistant.util import dt as dt_util
 from ..const import DOMAIN, ELECTRICITY, ENSEMBLE, FC_CHEAPEST_LOOKAHEAD_H, LEAD_BUCKETS, NAME
 from .coordinator import DynTarNLForecastCoordinator
 from .model import ForecastConfig
-from .views import chart_series, cheapest_block, forecast_chart, next_24h, tomorrow
+from .views import chart_series, chart_step, cheapest_block, forecast_chart, next_24h, tomorrow
 
 PRICE_UNIT = f"{CURRENCY_EURO}/kWh"
 FIRST_BUCKET = LEAD_BUCKETS[0][0]
@@ -84,8 +84,10 @@ def _cheapest(c: Coord) -> dict | None:
 def _avg_attrs(c: Coord) -> dict | None:
     merged = _merged(c)
     info = _clean(next_24h(merged, dt_util.utcnow()), drop=("avg_price_allin",)) or {}
-    prices, band = chart_series(merged)
-    forecast, forecast_market = forecast_chart(merged, c.data.tariff if c.data else None)
+    prices = chart_series(merged)
+    forecast, forecast_market, band = forecast_chart(
+        merged, c.data.tariff if c.data else None, chart_step(merged)
+    )
     forecasts = [r for r in merged if r.source != "published"]
     info.update(
         {

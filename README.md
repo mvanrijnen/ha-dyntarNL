@@ -390,7 +390,8 @@ Zet je de optie uit (of een bron), dan worden de bijbehorende entiteiten automat
 ### Voorspelling in de grafiek
 
 De sensor `sensor.dyntarnl_e_all_in_forecast_avg` heeft twee kant-en-klare reeksen met **alleen
-de voorspelde kwartieren**:
+de voorspelde uren** (per uur, net als de kolommen; anders tekent ApexCharts alle kolommen vier
+keer zo smal):
 
 - `forecast`: de all-in prijs;
 - `forecast_market`: de beursprijs incl. btw, net als de reeks van `..._market_now`.
@@ -447,7 +448,7 @@ Neem de [voorbeeldkaart](#voorbeeld-kaart-all-in-én-beurs-in-één-grafiek) en 
       return entity.attributes.forecast_market || [];
 ```
 
-Wil je ook de onzekerheid zien? `error_band` geeft per voorspeld kwartier
+Wil je ook de onzekerheid zien? `error_band` geeft per voorspeld uur
 `[epoch-ms, laag, hoog]` (all-in ± verwachte fout). Twee dunne lijnen maken daar een band van:
 
 ```yaml

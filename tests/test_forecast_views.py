@@ -104,20 +104,29 @@ def test_service_gas_is_published_only_on_native_resolution():
     assert len(out["records"]) == 1 and out["unit"] == "m³"
 
 
-def test_forecast_chart_only_contains_forecast_quarters():
-    from dyntarnl.forecast.views import forecast_chart
+def test_forecast_chart_is_hourly_like_the_columns():
+    """Kwartierpunten zouden de uurkolommen in ApexCharts 4x zo smal maken."""
+    from dyntarnl.forecast.views import chart_step, forecast_chart
 
-    data, _ = _forecast([0.10] * 8, prices=prices_data(tomorrow=None))
-    allin, market = forecast_chart(data.merged, data.tariff)
-    assert len(allin) == len(market) == 8
-    forecast = [r for r in data.merged if r.source == "forecast"]
-    assert allin[0][0] == int(forecast[0].start.timestamp() * 1000)
-    assert allin[0][1] == pytest.approx((0.10 + 0.02 + 0.09161) * 1.21, abs=1e-5)
-    assert market[0][1] == pytest.approx(0.10 * 1.21, abs=1e-5)  # beurs incl. btw
+    data, _ = _forecast([0.08, 0.10, 0.12, 0.14, 0.20, 0.20, 0.20, 0.20], [0.10] * 8)
+    step = chart_step(data.merged)
+    assert step == timedelta(hours=1)  # leverancier publiceert per uur
+    allin, market, band = forecast_chart(data.merged, data.tariff, step)
+    assert len(allin) == len(market) == len(band) == 2
+    assert allin[1][0] - allin[0][0] == 3_600_000
+    # eerste uur: ensemble per kwartier (0.09, 0.10, 0.11, 0.12) → gemiddeld 0.105 kaal
+    assert allin[0][0] == int(TOMORROW.timestamp() * 1000)
+    assert allin[0][1] == pytest.approx((0.105 + 0.02 + 0.09161) * 1.21, abs=1e-5)
+    assert market[0][1] == pytest.approx(0.105 * 1.21, abs=1e-5)  # beurs incl. btw
+    low, high = band[0][1], band[0][2]
+    assert low < allin[0][1] < high
 
 
-def test_forecast_chart_empty_without_tariff():
+def test_forecast_chart_only_forecast_and_needs_tariff():
     from dyntarnl.forecast.views import forecast_chart
 
     data, _ = _forecast([0.10] * 8)
-    assert forecast_chart(data.merged, None) == ([], [])
+    allin, _, _ = forecast_chart(data.merged, data.tariff)
+    published_end = max(r.end for r in data.merged if r.source == "published")
+    assert all(ms >= published_end.timestamp() * 1000 for ms, _ in allin)
+    assert forecast_chart(data.merged, None) == ([], [], [])

@@ -87,31 +87,56 @@ def tomorrow(records: list[QuarterRecord], now: datetime) -> dict | None:
     return {"date": day.isoformat(), "coverage_hours": len(chosen) / 4, **_summary(chosen)}
 
 
-def chart_series(records: list[QuarterRecord]) -> tuple[list, list]:
-    """[[epoch-ms, all-in, 'p'|'f']] plus een foutband [[epoch-ms, laag, hoog]]."""
-    prices, band = [], []
-    for r in records:
-        if r.price_allin is None:
-            continue
-        ms = int(r.start.timestamp() * 1000)
-        prices.append([ms, round(r.price_allin, 5), "p" if r.source == SOURCE_PUBLISHED else "f"])
-        if r.source != SOURCE_PUBLISHED and r.expected_error_allin is not None:
-            band.append([ms, round(r.price_allin - r.expected_error_allin, 5), round(r.price_allin + r.expected_error_allin, 5)])
-    return prices, band
+def chart_series(records: list[QuarterRecord]) -> list:
+    """De volledige reeks per kwartier: [[epoch-ms, all-in, 'p'|'f']]."""
+    return [
+        [int(r.start.timestamp() * 1000), round(r.price_allin, 5), "p" if r.source == SOURCE_PUBLISHED else "f"]
+        for r in records
+        if r.price_allin is not None
+    ]
 
 
-def forecast_chart(records: list[QuarterRecord], tariff: Tariff | None) -> tuple[list, list]:
-    """Alleen de voorspelde kwartieren, als grafiekreeksen naast de bestaande kaart:
-    [[epoch-ms, all-in]] en [[epoch-ms, beurs incl. btw]] (zoals `..._market_now`).
-    De beurs komt uit dezelfde apply_formula als de all-in."""
-    allin, market = [], []
+def chart_step(records: list[QuarterRecord]) -> timedelta:
+    """Resolutie van de gepubliceerde prijzen: een uur als de leverancier per uur
+    publiceert (of er nog niets is), anders een kwartier."""
+    published = [r for r in records if r.source == SOURCE_PUBLISHED]
+    return QUARTER if published and not any(r.expanded for r in published) else timedelta(hours=1)
+
+
+def forecast_chart(
+    records: list[QuarterRecord], tariff: Tariff | None, step: timedelta = timedelta(hours=1)
+) -> tuple[list, list, list]:
+    """Alleen de voorspelde tijdvakken, als grafiekreeksen naast de bestaande kaart:
+    all-in [[ms, prijs]], beurs incl. btw [[ms, prijs]] en foutband [[ms, laag, hoog]].
+
+    Gemiddeld per `step` (standaard per uur, net als de gepubliceerde kolommen):
+    ApexCharts baseert de kolombreedte op het kleinste tijdsverschil over álle series,
+    dus kwartierpunten zouden de uurkolommen vier keer zo smal maken. Beurs en all-in
+    komen uit dezelfde apply_formula, toegepast op de gemiddelde kale prijs.
+    """
+    if tariff is None:
+        return [], [], []
+    size = int(step.total_seconds())
+    groups: dict[int, list[QuarterRecord]] = {}
     for r in records:
-        if r.source == SOURCE_PUBLISHED or r.price_allin is None or tariff is None:
+        if r.source == SOURCE_PUBLISHED:
             continue
-        ms = int(r.start.timestamp() * 1000)
-        allin.append([ms, round(r.price_allin, 5)])
-        market.append([ms, round(apply_formula(r.start, r.end, r.price_raw, tariff).market, 5)])
-    return allin, market
+        ts = int(r.start.timestamp())
+        groups.setdefault(ts - ts % size, []).append(r)
+
+    allin, market, band = [], [], []
+    for ts in sorted(groups):
+        group = groups[ts]
+        begin = dt_util.as_utc(datetime.fromtimestamp(ts, tz=dt_util.UTC))
+        slot = apply_formula(begin, begin + step, sum(r.price_raw for r in group) / len(group), tariff)
+        ms = ts * 1000
+        allin.append([ms, round(slot.total, 5)])
+        market.append([ms, round(slot.market, 5)])
+        errors = [r.expected_error_allin for r in group if r.expected_error_allin is not None]
+        if errors:
+            err = sum(errors) / len(errors)
+            band.append([ms, round(slot.total - err, 5), round(slot.total + err, 5)])
+    return allin, market, band
 
 
 def service_response(
