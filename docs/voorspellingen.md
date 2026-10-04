@@ -249,6 +249,13 @@ De voorspelling past naast de bestaande [voorbeeldkaart](../README.md#voorbeeld-
 - **Gestippelde blauwe lijn** = voorspelde beursprijs.
 - Optioneel: **dunne grijze stippellijnen** boven en onder de voorspelling = de verwachte marge.
 
+De **grote bedragen in de header** (links all-in, rechts beurs) zijn de prijzen van het
+**huidige uur**, mits de gepubliceerde series `in_header: before_now` hebben (zoals in het
+README-voorbeeld). Zonder die regel toont apexcharts-card het laatste punt van de reeks, dus
+bijvoorbeeld de prijs van morgen 23:00. De voorspelde series staan bewust niet in de header
+(`in_header: false`). In de legenda staat bij een serie wél altijd de laatste waarde; bij
+"all-in (voorspeld)" is dat dus het laatste voorspelde kwartier, niet een prijs van nu.
+
 Kort gezegd: **massief = zeker, gestippeld = voorspeld**. Het verschil tussen de oranje/gele
 vlakken en de blauwe lijn is (net als bij de kolommen) je opslag + energiebelasting.
 
@@ -262,7 +269,8 @@ verschil tussen zeker en voorspeld meteen zichtbaar.
 
 ### Instellen
 
-Neem de voorbeeldkaart uit de README en pas twee dingen aan:
+Neem de voorbeeldkaart uit de README (met `in_header: before_now` op de twee gepubliceerde
+series) en pas twee dingen aan:
 
 1. `graph_span: 120h` (gisteren + vandaag + drie dagen vooruit).
 2. Voeg onder `series:` deze twee series toe:

@@ -133,6 +133,10 @@ reeks: `..._all_in_now` de all-in prijzen, `..._market_now` de kale beurs.
 
 ![Grafiek: all-in prijzen als kolommen, beursprijs als lijn, gisteren t/m morgen](docs/priceoverview.png)
 
+> **Het bedrag in de header** is dankzij `in_header: before_now` de prijs van het huidige uur.
+> Laat je dat weg, dan toont apexcharts-card bij een `data_generator` het **laatste** punt van
+> de reeks (bijvoorbeeld morgen 23:00) — niet de huidige prijs.
+>
 > De kaart ververst zichzelf elke 5 minuten. Dat is nodig omdat apexcharts-card standaard
 > alleen hertekent bij een **state**-wijziging, terwijl deze grafiek uit de **attributen** leest:
 > zonder `update_interval` verschijnen de prijzen van morgen pas zodra de prijs van het huidige
@@ -184,6 +188,8 @@ series:
     float_precision: 3
     unit: " €/kWh"
     show:
+      in_header: before_now  # header = prijs van NU (zonder dit: het laatste punt
+                             # van de reeks, bijv. morgen 23:00)
       extremas: true
       header_color_threshold: true
     color_threshold:
@@ -206,6 +212,8 @@ series:
     extend_to: false
     float_precision: 3
     unit: " €/kWh"
+    show:
+      in_header: before_now
     data_generator: |
       return entity.attributes.prices;
 ```
