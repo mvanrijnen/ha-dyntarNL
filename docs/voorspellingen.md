@@ -15,7 +15,7 @@ die grafiek leest.
 - [Nauwkeurigheid en verwachte fout](#nauwkeurigheid-en-verwachte-fout)
 - [Entiteiten](#entiteiten)
 - [Service `dyntarnl.get_prices`](#service-dyntarnlget_prices)
-- [De grafiek](#de-grafiek)
+- [De grafiek](#de-grafiek) (en [als tabel](#als-tabel))
 - [Ophalen, fair use en storingen](#ophalen-fair-use-en-storingen)
 - [Beperkingen](#beperkingen)
 - [Problemen oplossen](#problemen-oplossen)
@@ -372,6 +372,69 @@ andere `stroke_dash`, of geef de voorspelling één vaste kleur (`color:`) in pl
 **Data per bron in plaats van het ensemble?** Gebruik een
 [template-sensor](https://www.home-assistant.io/integrations/template/) of een script met
 `dyntarnl.get_prices` en `provider: epexpredictor` (of `energypriceforecast`).
+
+### Als tabel
+
+Liever cijfers dan een grafiek? Een standaard **Markdown-kaart** zet de gepubliceerde en
+voorspelde uren in twee tabellen:
+
+- **Per dag:** gemiddelde, laagste en hoogste all-in prijs, met de bron (`gepubliceerd`,
+  `voorspeld` of `gemengd`). Vandaag telt de hele dag mee.
+- **Per uur:** de komende 48 uur, met all-in, beurs en de bron. Bij voorspelde uren staat
+  ook de marge (± verwachte fout), zodra die bekend is.
+
+🟢 is onder € 0,25, 🟡 tot € 0,40 en 🔴 daarboven: dezelfde drempels als de grafiek. Pas
+`uren` bovenaan aan voor een kortere of langere uurtabel.
+
+```yaml
+type: markdown
+title: Stroomprijzen
+content: |
+  {%- set uren = 48 -%}
+  {%- set nu = now().timestamp() -%}
+  {%- set a_now = 'sensor.dyntarnl_e_all_in_now' -%}
+  {%- set m_now = 'sensor.dyntarnl_e_market_now' -%}
+  {%- set fc_ent = 'sensor.dyntarnl_e_all_in_forecast_avg' -%}
+  {%- set allin = (state_attr(a_now, 'today') or []) + (state_attr(a_now, 'tomorrow') or []) -%}
+  {%- set beurs = (state_attr(m_now, 'today') or []) + (state_attr(m_now, 'tomorrow') or []) -%}
+  {%- set fc = state_attr(fc_ent, 'forecast') or [] -%}
+  {%- set fm = state_attr(fc_ent, 'forecast_market') or [] -%}
+  {%- set eb = state_attr(fc_ent, 'error_band') or [] -%}
+  {%- set ns = namespace(rows=[], marge={}) -%}
+  {%- for e in eb -%}
+    {%- set ns.marge = dict(ns.marge, **{e[0] | string: (e[2] - e[1]) / 2}) -%}
+  {%- endfor -%}
+  {%- for p in allin -%}
+    {%- set t = as_timestamp(p.start) -%}
+    {%- set b = beurs[loop.index0].price if beurs | length > loop.index0 else none -%}
+    {%- set ns.rows = ns.rows + [{'t': t, 'd': t | timestamp_custom('%Y-%m-%d'), 'a': p.price, 'b': b, 'f': false, 'm': none}] -%}
+  {%- endfor -%}
+  {%- for p in fc -%}
+    {%- set t = p[0] / 1000 -%}
+    {%- set b = fm[loop.index0][1] if fm | length > loop.index0 else none -%}
+    {%- set ns.rows = ns.rows + [{'t': t, 'd': t | timestamp_custom('%Y-%m-%d'), 'a': p[1], 'b': b, 'f': true, 'm': ns.marge.get(p[0] | string)}] -%}
+  {%- endfor -%}
+  {%- macro eur(x) -%}{{ '%.3f' | format(x) | replace('.', ',') }}{%- endmacro -%}
+  {%- macro dag(ts) -%}{{ ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'][ts | timestamp_custom('%w') | int] }}{%- endmacro -%}
+  {%- macro kleur(x) -%}{{ '🟢' if x < 0.25 else ('🟡' if x < 0.40 else '🔴') }}{%- endmacro -%}
+  ### Per dag
+
+  | Dag | Gem. | Min | Max | Bron |
+  |:--|--:|--:|--:|:--|
+  {% for d, rs in ns.rows | groupby('d') -%}
+  {%- set prijzen = rs | map(attribute='a') | list -%}
+  {%- set nf = rs | selectattr('f') | list | count -%}
+  {%- set ts = as_timestamp(d ~ 'T12:00:00') -%}
+  | {{ dag(ts) }} {{ ts | timestamp_custom('%d-%m') }} | {{ kleur(prijzen | average) }} {{ eur(prijzen | average) }} | {{ eur(prijzen | min) }} | {{ eur(prijzen | max) }} | {{ 'gepubliceerd' if nf == 0 else ('voorspeld' if nf == rs | count else 'gemengd') }} |
+  {% endfor %}
+  ### Per uur (komende {{ uren }} uur)
+
+  | Tijd | All-in | Beurs | Bron |
+  |:--|--:|--:|:--|
+  {% for r in ns.rows if r.t + 3600 > nu and r.t < nu + uren * 3600 -%}
+  | {{ dag(r.t) }} {{ r.t | timestamp_custom('%H:%M') }} | {{ kleur(r.a) }} {{ eur(r.a) }} | {{ eur(r.b) if r.b is not none else '–' }} | {{ ('≈ voorspeld' ~ (' ±' ~ eur(r.m) if r.m is not none else '')) if r.f else 'gepubliceerd' }} |
+  {% endfor %}
+```
 
 ## Ophalen, fair use en storingen
 
