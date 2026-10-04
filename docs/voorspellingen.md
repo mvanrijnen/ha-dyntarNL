@@ -253,8 +253,9 @@ De **grote bedragen in de header** (links all-in, rechts beurs) zijn de prijzen 
 **huidige uur**, mits de gepubliceerde series `in_header: before_now` hebben (zoals in het
 README-voorbeeld). Zonder die regel toont apexcharts-card het laatste punt van de reeks, dus
 bijvoorbeeld de prijs van morgen 23:00. De voorspelde series staan bewust niet in de header
-(`in_header: false`). In de legenda staat bij een serie wél altijd de laatste waarde; bij
-"all-in (voorspeld)" is dat dus het laatste voorspelde kwartier, niet een prijs van nu.
+(`in_header: false`). De **legenda** toont standaard het laatste punt van elke serie; de
+`legend.formatter` uit het README-voorbeeld maakt daar de waarde van nu van. Voorspelde series
+hebben nog geen punt vóór nu en tonen daarom alleen hun naam.
 
 Kort gezegd: **massief = zeker, gestippeld = voorspeld**. Het verschil tussen de oranje/gele
 vlakken en de blauwe lijn is (net als bij de kolommen) je opslag + energiebelasting.

@@ -133,9 +133,11 @@ reeks: `..._all_in_now` de all-in prijzen, `..._market_now` de kale beurs.
 
 ![Grafiek: all-in prijzen als kolommen, beursprijs als lijn, gisteren t/m morgen](docs/priceoverview.png)
 
-> **Het bedrag in de header** is dankzij `in_header: before_now` de prijs van het huidige uur.
-> Laat je dat weg, dan toont apexcharts-card bij een `data_generator` het **laatste** punt van
-> de reeks (bijvoorbeeld morgen 23:00) — niet de huidige prijs.
+> **De bedragen in de header en de legenda** zijn de prijs van het huidige uur: de header
+> dankzij `in_header: before_now`, de legenda dankzij de `legend.formatter`. Laat je die weg,
+> dan toont apexcharts-card bij een `data_generator` het **laatste** punt van de reeks
+> (bijvoorbeeld morgen 23:00), niet de huidige prijs. Werkt de formatter bij jou niet, verberg
+> de waarden in de legenda dan met `legend_value: false` onder `show:` van elke serie.
 >
 > De kaart ververst zichzelf elke 5 minuten. Dat is nodig omdat apexcharts-card standaard
 > alleen hertekent bij een **state**-wijziging, terwijl deze grafiek uit de **attributen** leest:
@@ -180,6 +182,19 @@ apex_config:
   xaxis:
     labels:
       format: ddd HH:mm  # zonder dagnaam leest elk label '00:00'
+  legend:
+    # Legenda = waarde van NU (laatste punt vóór nu), net als de header.
+    # Zonder dit toont apexcharts-card het laatste punt van de reeks.
+    formatter: |
+      EVAL:function(name, opts) {
+        const xs = opts.w.globals.seriesX[opts.seriesIndex] || [];
+        const ys = opts.w.globals.series[opts.seriesIndex] || [];
+        const now = Date.now();
+        let v = null;
+        for (let i = 0; i < xs.length && xs[i] <= now; i++) v = ys[i];
+        if (v === null || v === undefined) return name;
+        return name + ': ' + v.toLocaleString('nl-NL', {minimumFractionDigits: 3, maximumFractionDigits: 3}) + ' €/kWh';
+      }
 series:
   - entity: sensor.dyntarnl_e_all_in_now
     name: all-in
