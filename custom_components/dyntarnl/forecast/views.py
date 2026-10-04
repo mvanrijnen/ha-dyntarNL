@@ -8,6 +8,7 @@ from homeassistant.util import dt as dt_util
 
 from ..const import ELECTRICITY, ENSEMBLE
 from ..model import PriceData
+from ..prices import Tariff, apply_formula
 from .engine import ForecastData, merge, primary_series, published_records
 from .model import QUARTER, SOURCE_PUBLISHED, ForecastConfig, QuarterRecord, floor_quarter
 
@@ -97,6 +98,20 @@ def chart_series(records: list[QuarterRecord]) -> tuple[list, list]:
         if r.source != SOURCE_PUBLISHED and r.expected_error_allin is not None:
             band.append([ms, round(r.price_allin - r.expected_error_allin, 5), round(r.price_allin + r.expected_error_allin, 5)])
     return prices, band
+
+
+def forecast_chart(records: list[QuarterRecord], tariff: Tariff | None) -> tuple[list, list]:
+    """Alleen de voorspelde kwartieren, als grafiekreeksen naast de bestaande kaart:
+    [[epoch-ms, all-in]] en [[epoch-ms, beurs incl. btw]] (zoals `..._market_now`).
+    De beurs komt uit dezelfde apply_formula als de all-in."""
+    allin, market = [], []
+    for r in records:
+        if r.source == SOURCE_PUBLISHED or r.price_allin is None or tariff is None:
+            continue
+        ms = int(r.start.timestamp() * 1000)
+        allin.append([ms, round(r.price_allin, 5)])
+        market.append([ms, round(apply_formula(r.start, r.end, r.price_raw, tariff).market, 5)])
+    return allin, market
 
 
 def service_response(

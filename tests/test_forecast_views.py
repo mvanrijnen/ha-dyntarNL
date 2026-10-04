@@ -102,3 +102,22 @@ def test_service_gas_is_published_only_on_native_resolution():
     data, c = _forecast([0.10] * 4)
     out = service_response(prices, data, c, "Essent", GAS, True, "ensemble", None, NOW)
     assert len(out["records"]) == 1 and out["unit"] == "m³"
+
+
+def test_forecast_chart_only_contains_forecast_quarters():
+    from dyntarnl.forecast.views import forecast_chart
+
+    data, _ = _forecast([0.10] * 8, prices=prices_data(tomorrow=None))
+    allin, market = forecast_chart(data.merged, data.tariff)
+    assert len(allin) == len(market) == 8
+    forecast = [r for r in data.merged if r.source == "forecast"]
+    assert allin[0][0] == int(forecast[0].start.timestamp() * 1000)
+    assert allin[0][1] == pytest.approx((0.10 + 0.02 + 0.09161) * 1.21, abs=1e-5)
+    assert market[0][1] == pytest.approx(0.10 * 1.21, abs=1e-5)  # beurs incl. btw
+
+
+def test_forecast_chart_empty_without_tariff():
+    from dyntarnl.forecast.views import forecast_chart
+
+    data, _ = _forecast([0.10] * 8)
+    assert forecast_chart(data.merged, None) == ([], [])

@@ -64,8 +64,10 @@ bestaande sensoren, attributen of `entity_id`'s.
 
 - `sensor.dyntarnl_e_cheapest_block_start` — het goedkoopste blok van N uur in de komende
   48 uur, inclusief voorspellingen.
-- `sensor.dyntarnl_e_all_in_forecast_avg` — het gemiddelde over de komende 24 uur. De volledige
-  reeks staat in een attribuut dat niet in de recorder komt.
+- `sensor.dyntarnl_e_all_in_forecast_avg` — het gemiddelde over de komende 24 uur. De reeksen
+  `prices`, `forecast`, `forecast_market` en `error_band` staan in attributen die niet in de
+  recorder komen. De README heeft een ApexCharts-voorbeeld dat de voorspelling gestippeld naast
+  de gepubliceerde kolommen tekent.
 - `sensor.dyntarnl_e_tomorrow_avg_forecast` — het gemiddelde van morgen, gepubliceerd of voorspeld.
 - Diagnostiek per bron op het nieuwe device *DynTarNL Forecast*: `mae`, `bias`, `settled`,
   `weight` en `last_fetch`.

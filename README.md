@@ -376,6 +376,98 @@ op het ophalen of tonen van de gepubliceerde prijzen.**
 
 Zet je de optie uit (of een bron), dan worden de bijbehorende entiteiten automatisch opgeruimd.
 
+### Voorspelling in de grafiek
+
+De sensor `sensor.dyntarnl_e_all_in_forecast_avg` heeft twee kant-en-klare reeksen met **alleen
+de voorspelde kwartieren**:
+
+- `forecast`: de all-in prijs;
+- `forecast_market`: de beursprijs incl. btw, net als de reeks van `..._market_now`.
+
+Je kunt ze dus naast de bestaande voorbeeldkaart zetten. Gepubliceerde uren blijven
+kolommen. De voorspelling wordt een **gestippelde stepline met een lichte vulling**, in
+dezelfde kleurdrempels.
+
+De voorspelling is bewust geen tweede kolomserie: ApexCharts zou de kolombreedte dan over
+twee series verdelen, en alle kolommen worden half zo smal.
+
+Neem de [voorbeeldkaart](#voorbeeld-kaart-all-in-én-beurs-in-één-grafiek) en pas twee dingen aan:
+
+1. `graph_span: 120h`: gisteren + vandaag + drie dagen vooruit.
+2. Zet de volgende twee series onder `series:`:
+
+```yaml
+  - entity: sensor.dyntarnl_e_all_in_forecast_avg
+    name: all-in (voorspeld)
+    type: area
+    curve: stepline
+    stroke_width: 2
+    stroke_dash: 4         # gestippeld = voorspeld
+    opacity: 0.25          # lichte vulling, de kolommen blijven leidend
+    extend_to: false
+    float_precision: 3
+    unit: " €/kWh"
+    show:
+      in_header: false     # header blijft de gepubliceerde prijs van nu tonen
+    color_threshold:       # zelfde drempels als de kolommen
+      - value: -1
+        color: "#1b5e20"
+      - value: 0
+        color: "#43a047"
+      - value: 0.25
+        color: "#fbc02d"
+      - value: 0.40
+        color: "#e53935"
+    data_generator: |
+      return entity.attributes.forecast || [];
+  - entity: sensor.dyntarnl_e_all_in_forecast_avg
+    name: beurs (voorspeld)
+    type: line
+    curve: stepline
+    stroke_width: 2
+    stroke_dash: 4
+    color: var(--primary-color)
+    extend_to: false
+    float_precision: 3
+    unit: " €/kWh"
+    show:
+      in_header: false
+    data_generator: |
+      return entity.attributes.forecast_market || [];
+```
+
+Wil je ook de onzekerheid zien? `error_band` geeft per voorspeld kwartier
+`[epoch-ms, laag, hoog]` (all-in ± verwachte fout). Twee dunne lijnen maken daar een band van:
+
+```yaml
+  - entity: sensor.dyntarnl_e_all_in_forecast_avg
+    name: marge
+    type: line
+    curve: stepline
+    stroke_width: 1
+    stroke_dash: 2
+    color: "#9e9e9e"
+    extend_to: false
+    show:
+      in_header: false
+      in_legend: false
+    data_generator: |
+      return (entity.attributes.error_band || []).map(([t, lo]) => [t, lo]);
+  - entity: sensor.dyntarnl_e_all_in_forecast_avg
+    name: marge
+    type: line
+    curve: stepline
+    stroke_width: 1
+    stroke_dash: 2
+    color: "#9e9e9e"
+    extend_to: false
+    show:
+      in_header: false
+      in_legend: false
+    data_generator: |
+      return (entity.attributes.error_band || []).map(([t, , hi]) => [t, hi]);
+```
+
 ### Service `dyntarnl.get_prices`
 
 De belangrijkste manier om volledige reeksen op te halen. Werkt ook met de optie uit; dan
