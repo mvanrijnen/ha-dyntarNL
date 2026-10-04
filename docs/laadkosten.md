@@ -78,7 +78,9 @@ Alle bedragen zijn all-in in euro's. Elke sensor heeft deze attributen:
 
 De sessie-sensor heeft daarnaast:
 
-- `started`: de start van de sessie;
+- `started`: de start van de sessie (het moment dat de teller van de lader terugviel);
+- `charger_reading_kwh`: de stand van de sessie-teller van de lader zelf. Die hoort gelijk
+  te zijn aan `energy_kwh`, zolang HA de hele sessie heeft gezien;
 - `sessions`: de laatste 20 sessies met `id`, `start`, `end`, `kwh` en `cost`. Dit attribuut
   wordt niet in de recorder opgeslagen.
 

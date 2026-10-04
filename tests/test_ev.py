@@ -303,3 +303,19 @@ def test_session_list_survives_restart():
     assert restored.sessions() == m.tracker.sessions()
     restored.delete_session(restored.sessions()[1]["id"])
     assert restored.total["kwh"] == pytest.approx(1.5)
+
+
+def test_session_follows_the_charger_counter():
+    """Bij een sessie-teller: start = moment van terugvallen, kWh = stand van de lader."""
+    m = _manager()
+    t0 = DAY_START + timedelta(hours=8)
+    m.process(_state(0.0), t0)
+    m.process(_state(9.6), t0 + timedelta(hours=1))              # vorige sessie
+    drop = t0 + timedelta(hours=6)
+    m.process(_state(0.0), drop)                                  # auto ingeplugd: teller naar 0
+    m.process(_state(2.2), drop + timedelta(minutes=30))
+    m.process(_state(4.1), drop + timedelta(minutes=45))
+    session = m.tracker.value("session", drop)
+    assert session["start"] == drop.isoformat()                   # niet de vorige meting
+    assert session["kwh"] == pytest.approx(m.reading_kwh) == pytest.approx(4.1)
+    assert DynTarNLEvCostSensor(m, "session").extra_state_attributes["charger_reading_kwh"] == 4.1

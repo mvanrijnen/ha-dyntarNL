@@ -85,6 +85,10 @@ class DynTarNLEvCostSensor(SensorEntity):
         if self._key == SESSION:
             start = v.get("start")
             attrs["started"] = _local(start)
+            # Stand van de lader zelf: bij een sessie-teller hoort die gelijk te zijn aan
+            # energy_kwh (zolang HA de hele sessie heeft gezien).
+            if self._manager.mode == "energy" and self._manager.reading_kwh is not None:
+                attrs["charger_reading_kwh"] = round(self._manager.reading_kwh, 3)
             # Recente sessies, om er een te kunnen verwijderen (delete_ev_session).
             attrs["sessions"] = [
                 {

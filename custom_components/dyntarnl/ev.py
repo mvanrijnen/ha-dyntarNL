@@ -335,8 +335,9 @@ class EvCostManager:
                 last, since = self._last_energy
                 delta = reading - last
                 if delta < 0:
-                    # Teller is teruggevallen: nieuwe sessie, alles sinds de reset telt.
-                    self.tracker.start_session(since)
+                    # Teller is teruggevallen: nieuwe sessie (vanaf nu), en wat er sinds
+                    # de reset al op de teller staat telt mee.
+                    self.tracker.start_session(now)
                     delta = reading
                 if delta > 0:
                     self.tracker.add(since, now, delta, self.price_at)
@@ -357,6 +358,11 @@ class EvCostManager:
             self.tracker.add(since, now, kw * (now - since).total_seconds() / 3600, self.price_at)
             self._last_charging = now
         self._last_power = (kw, now)
+
+    @property
+    def reading_kwh(self) -> float | None:
+        """Laatste stand van de kWh-teller van de lader (om mee te vergelijken)."""
+        return self._last_energy[0] if self._last_energy else None
 
     @callback
     def tick(self, now: datetime | None = None) -> None:
