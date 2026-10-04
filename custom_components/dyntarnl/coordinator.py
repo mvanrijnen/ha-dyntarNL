@@ -82,6 +82,8 @@ class DynTarNLCoordinator(DataUpdateCoordinator[PriceData]):
         self.supplier = supplier_by_key(entry.data.get(CONF_SUPPLIER, ""))
         # Optionele voorspel-coordinator (forecast/coordinator.py); None = uit.
         self.forecast = None
+        # Optionele laadkosten-teller (ev.py); None = uit.
+        self.ev = None
 
     async def _async_update_data(self) -> PriceData:
         supplier = self.supplier

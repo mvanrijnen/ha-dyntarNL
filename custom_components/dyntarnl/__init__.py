@@ -14,8 +14,18 @@ from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, ELECTRICITY, ENSEMBLE, FC_MAX_HORIZON, FORECAST_DEFAULTS, GAS
+from .const import (
+    CONF_EV_SENSOR,
+    DOMAIN,
+    ELECTRICITY,
+    ENSEMBLE,
+    FC_MAX_HORIZON,
+    FORECAST_DEFAULTS,
+    GAS,
+)
 from .coordinator import DynTarNLConfigEntry, DynTarNLCoordinator
+from .ev import ALL_KEYS as EV_KEYS, EvCostManager, storage_key as ev_storage_key
+from .ev_sensor import ev_unique_ids, is_ev_unique_id
 from .forecast.accuracy import STORAGE_VERSION
 from .forecast.coordinator import DynTarNLForecastCoordinator, storage_key
 from .forecast.model import ForecastConfig
@@ -43,6 +53,11 @@ def _spread(entry_id: str, span: int) -> int:
 
 SERVICE_REFRESH = "refresh"
 SERVICE_GET_PRICES = "get_prices"
+SERVICE_RESET_EV = "reset_ev_cost"
+SERVICE_DELETE_EV_SESSION = "delete_ev_session"
+
+RESET_EV_SCHEMA = vol.Schema({vol.Required("period"): vol.In([*EV_KEYS, "all"])})
+DELETE_EV_SESSION_SCHEMA = vol.Schema({vol.Optional("session_id", default="last"): cv.string})
 
 GET_PRICES_SCHEMA = vol.Schema(
     {
@@ -79,6 +94,47 @@ def _register_services(hass: HomeAssistant) -> None:
             schema=GET_PRICES_SCHEMA,
             supports_response=SupportsResponse.ONLY,
         )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_RESET_EV):
+
+        async def _handle_reset_ev(call: ServiceCall) -> None:
+            reset_ev_cost(hass, call.data["period"])
+
+        hass.services.async_register(DOMAIN, SERVICE_RESET_EV, _handle_reset_ev, schema=RESET_EV_SCHEMA)
+
+    if not hass.services.has_service(DOMAIN, SERVICE_DELETE_EV_SESSION):
+
+        async def _handle_delete_session(call: ServiceCall) -> ServiceResponse:
+            return {"deleted": delete_ev_session(hass, call.data["session_id"])}
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_DELETE_EV_SESSION,
+            _handle_delete_session,
+            schema=DELETE_EV_SESSION_SCHEMA,
+            supports_response=SupportsResponse.OPTIONAL,
+        )
+
+
+def _ev_manager(hass: HomeAssistant) -> EvCostManager:
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        coordinator: DynTarNLCoordinator | None = getattr(entry, "runtime_data", None)
+        if coordinator is not None and coordinator.ev is not None:
+            return coordinator.ev
+    raise ServiceValidationError("Laadkosten EV staat niet aan (kies een lader-sensor in Configureren)")
+
+
+def delete_ev_session(hass: HomeAssistant, session_id: str) -> dict:
+    """Haal een laadsessie (bijv. van een andere auto) van alle tellers af."""
+    try:
+        return _ev_manager(hass).delete_session(session_id)
+    except ValueError as err:
+        raise ServiceValidationError(str(err)) from err
+
+
+def reset_ev_cost(hass: HomeAssistant, period: str) -> None:
+    """Zet een laadkosten-teller (of 'all') handmatig op 0."""
+    _ev_manager(hass).reset(period)
 
 
 def get_prices(hass: HomeAssistant, params: dict) -> dict:
@@ -122,21 +178,27 @@ async def async_migrate_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -
     return True
 
 
-def _cleanup_forecast_entities(
-    hass: HomeAssistant, entry: DynTarNLConfigEntry, cfg: ForecastConfig
+def _cleanup_optional_entities(
+    hass: HomeAssistant, entry: DynTarNLConfigEntry, cfg: ForecastConfig, ev_enabled: bool
 ) -> None:
-    """Ruim voorspel-entiteiten op die bij de huidige opties niet meer horen
-    (optie uit, of een provider uitgezet); anders blijven er 'unavailable'-wezen."""
+    """Ruim voorspel- en laadkosten-entiteiten op die bij de huidige opties niet meer
+    horen (optie uit, of een provider uitgezet); anders blijven er 'unavailable'-wezen."""
     from homeassistant.helpers import device_registry as dr, entity_registry as er
 
+    entry_id = entry.entry_id
     registry = er.async_get(hass)
-    keep = forecast_unique_ids(entry.entry_id, cfg)
-    for ent in er.async_entries_for_config_entry(registry, entry.entry_id):
-        if is_forecast_unique_id(entry.entry_id, ent.unique_id) and ent.unique_id not in keep:
+    keep = forecast_unique_ids(entry_id, cfg) | ev_unique_ids(entry_id, ev_enabled)
+    for ent in er.async_entries_for_config_entry(registry, entry_id):
+        optional = is_forecast_unique_id(entry_id, ent.unique_id) or is_ev_unique_id(
+            entry_id, ent.unique_id
+        )
+        if optional and ent.unique_id not in keep:
             registry.async_remove(ent.entity_id)
-    if not cfg.enabled:
-        devices = dr.async_get(hass)
-        device = devices.async_get_device(identifiers={(DOMAIN, f"{entry.entry_id}_forecast")})
+    devices = dr.async_get(hass)
+    for suffix, enabled in (("forecast", cfg.enabled), ("ev", ev_enabled)):
+        if enabled:
+            continue
+        device = devices.async_get_device(identifiers={(DOMAIN, f"{entry_id}_{suffix}")})
         if device is not None:
             devices.async_remove_device(device.id)
 
@@ -176,9 +238,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -> 
 
     # Voorspellingen: alleen als de optie aan staat. Uit = exact het oude gedrag.
     forecast_cfg = ForecastConfig.from_options(entry.options)
-    _cleanup_forecast_entities(hass, entry, forecast_cfg)
+    ev_sensor = entry.options.get(CONF_EV_SENSOR) or ""
+    _cleanup_optional_entities(hass, entry, forecast_cfg, bool(ev_sensor))
     if forecast_cfg.enabled:
         coordinator.forecast = DynTarNLForecastCoordinator(hass, entry, coordinator, forecast_cfg)
+    # Laadkosten EV: alleen als er een lader-sensor gekozen is.
+    if ev_sensor:
+        coordinator.ev = EvCostManager(hass, entry, coordinator, ev_sensor)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     _register_services(hass)
@@ -228,6 +294,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -> 
     # 3) Voorspellingen (optioneel): eigen, losgekoppelde timers.
     if coordinator.forecast is not None:
         _setup_forecast(hass, entry, coordinator)
+    # 4) Laadkosten EV (optioneel): luistert naar de sensor van de lader.
+    if coordinator.ev is not None:
+        entry.async_create_background_task(hass, coordinator.ev.async_start(), "dyntarnl_ev_start")
     return True
 
 
@@ -236,9 +305,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) ->
     if unloaded and not hass.config_entries.async_loaded_entries(DOMAIN):
         hass.services.async_remove(DOMAIN, SERVICE_REFRESH)
         hass.services.async_remove(DOMAIN, SERVICE_GET_PRICES)
+        hass.services.async_remove(DOMAIN, SERVICE_RESET_EV)
+        hass.services.async_remove(DOMAIN, SERVICE_DELETE_EV_SESSION)
     return unloaded
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -> None:
     """Integratie verwijderd: ook de opgeslagen voorspellingen/statistiek weg."""
     await Store(hass, STORAGE_VERSION, storage_key(entry.entry_id)).async_remove()
+    await Store(hass, 1, ev_storage_key(entry.entry_id)).async_remove()

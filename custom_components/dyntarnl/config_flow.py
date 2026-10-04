@@ -11,6 +11,8 @@ from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     BooleanSelector,
+    EntitySelector,
+    EntitySelectorConfig,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -22,6 +24,7 @@ from homeassistant.helpers.selector import (
 
 from .const import (
     CONF_EPEX_SOURCE,
+    CONF_EV_SENSOR,
     CONF_FC_ACCURACY,
     CONF_FC_BIAS,
     CONF_FC_CHEAPEST_HOURS,
@@ -165,9 +168,11 @@ def _select(options: list[str], key: str, multiple: bool = False) -> SelectSelec
 class DynTarNLOptionsFlow(OptionsFlow):
     """Voorspellingen aan/uit en instellen; aanpasbaar zonder opnieuw toevoegen.
 
-    init (hoofdschakelaar) → forecast (algemeen) → provider_settings (per gekozen
-    provider) → advanced. Uit = direct opslaan; de overige waarden blijven bewaard
-    zodat ze terugkomen als je het later weer aanzet.
+    init is een menu:
+    - forecast_toggle (hoofdschakelaar) → forecast (algemeen) → provider_settings
+      (per gekozen provider) → advanced. Uit = direct opslaan; de overige waarden
+      blijven bewaard zodat ze terugkomen als je het later weer aanzet.
+    - ev: de sensor van de EV-lader voor de laadkosten (leeg = uit).
     """
 
     def __init__(self) -> None:
@@ -177,6 +182,28 @@ class DynTarNLOptionsFlow(OptionsFlow):
         return {**FORECAST_DEFAULTS, **self.config_entry.options, **self._options}
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        return self.async_show_menu(step_id="init", menu_options=["forecast_toggle", "ev"])
+
+    async def async_step_ev(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Laadkosten EV: kies een kWh-teller (totaal of per sessie) of vermogen-sensor."""
+        if user_input is not None:
+            # Leeggemaakt veld stuurt HA niet mee: dat betekent 'uit'.
+            self._options = {**self._current(), CONF_EV_SENSOR: user_input.get(CONF_EV_SENSOR) or ""}
+            return self.async_create_entry(data=self._options)
+
+        current = self._current().get(CONF_EV_SENSOR) or None
+        schema = vol.Schema(
+            {
+                vol.Optional(CONF_EV_SENSOR, description={"suggested_value": current}): EntitySelector(
+                    EntitySelectorConfig(domain="sensor", device_class=["energy", "power"])
+                )
+            }
+        )
+        return self.async_show_form(step_id="ev", data_schema=schema)
+
+    async def async_step_forecast_toggle(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         if user_input is not None:
             self._options = {**self._current(), **user_input}
             if not user_input[CONF_FORECAST]:
@@ -187,7 +214,7 @@ class DynTarNLOptionsFlow(OptionsFlow):
         schema = vol.Schema(
             {vol.Required(CONF_FORECAST, default=current[CONF_FORECAST]): BooleanSelector()}
         )
-        return self.async_show_form(step_id="init", data_schema=schema)
+        return self.async_show_form(step_id="forecast_toggle", data_schema=schema)
 
     async def async_step_forecast(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}

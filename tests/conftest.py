@@ -79,6 +79,9 @@ def _install_ha_stubs() -> None:
         def async_create_entry(self, **kw):
             return {"type": "create_entry", **kw}
 
+        def async_show_menu(self, **kw):
+            return {"type": "menu", **kw}
+
     class ConfigFlow(_FlowBase):
         def __init_subclass__(cls, domain=None, **kw):
             super().__init_subclass__(**kw)
@@ -104,12 +107,15 @@ def _install_ha_stubs() -> None:
     core.HomeAssistant = object
     core.ServiceCall = object
     core.callback = lambda f: f
+    core.Event = object
     core.ServiceResponse = dict
     core.SupportsResponse = type("SupportsResponse", (), {"ONLY": "only", "OPTIONAL": "optional"})
 
     helpers = _mod("homeassistant.helpers")
     _mod("homeassistant.helpers.aiohttp_client").async_get_clientsession = lambda hass: None
-    _mod("homeassistant.helpers.event").async_track_time_change = lambda *a, **k: None
+    event = _mod("homeassistant.helpers.event")
+    event.async_track_time_change = lambda *a, **k: None
+    event.async_track_state_change_event = lambda *a, **k: None
 
     cv = _mod("homeassistant.helpers.config_validation")
     cv.boolean = bool
@@ -143,7 +149,7 @@ def _install_ha_stubs() -> None:
     selector = _mod("homeassistant.helpers.selector")
     for name in (
         "BooleanSelector", "NumberSelector", "NumberSelectorConfig", "SelectSelector",
-        "SelectSelectorConfig", "TextSelector", "TextSelectorConfig",
+        "SelectSelectorConfig", "TextSelector", "TextSelectorConfig", "EntitySelector",
     ):
         setattr(selector, name, lambda *a, _n=name, **k: (_n, a, k))
     selector.SelectOptionDict = dict
@@ -158,6 +164,7 @@ def _install_ha_stubs() -> None:
     selector.NumberSelectorConfig = _strict_config
     selector.SelectSelectorConfig = _strict_config
     selector.TextSelectorConfig = _strict_config
+    selector.EntitySelectorConfig = _strict_config
     selector.NumberSelectorMode = type("NumberSelectorMode", (), {"BOX": "box", "SLIDER": "slider"})
     selector.SelectSelectorMode = type("SelectSelectorMode", (), {"DROPDOWN": "dropdown", "LIST": "list"})
     selector.TextSelectorType = type("TextSelectorType", (), {"URL": "url", "PASSWORD": "password", "TEXT": "text"})
@@ -237,8 +244,8 @@ def _install_ha_stubs() -> None:
 
     sensor.SensorEntityDescription = SensorEntityDescription
     sensor.SensorEntity = object
-    sensor.SensorStateClass = type("SensorStateClass", (), {"MEASUREMENT": "measurement"})
-    sensor.SensorDeviceClass = type("SensorDeviceClass", (), {"TIMESTAMP": "timestamp"})
+    sensor.SensorStateClass = type("SensorStateClass", (), {"MEASUREMENT": "measurement", "TOTAL": "total"})
+    sensor.SensorDeviceClass = type("SensorDeviceClass", (), {"TIMESTAMP": "timestamp", "MONETARY": "monetary"})
 
     binary = _mod("homeassistant.components.binary_sensor")
 

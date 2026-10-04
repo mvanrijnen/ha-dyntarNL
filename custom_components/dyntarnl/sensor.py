@@ -300,4 +300,8 @@ async def async_setup_entry(
         from .forecast.sensor import forecast_entities
 
         entities.extend(forecast_entities(coordinator.forecast))
+    if coordinator.ev is not None:
+        from .ev_sensor import ev_entities
+
+        entities.extend(ev_entities(coordinator.ev))
     async_add_entities(entities)

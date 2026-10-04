@@ -82,17 +82,30 @@
           "description": "Alleen kwartieren tot zoveel uur vanaf nu."
         }
       }
+    },
+    "reset_ev_cost": {
+      "name": "Laadkosten EV resetten",
+      "description": "Zet een van de laadkosten-tellers (of alle) terug op 0.",
+      "fields": {
+        "period": {
+          "name": "Periode",
+          "description": "session, day, month, quarter, year, total of all."
+        }
+      }
+    },
+    "delete_ev_session": {
+      "name": "Laadsessie verwijderen",
+      "description": "Haalt een laadsessie (bijv. van een andere auto) van alle laadkosten-tellers af. Loopt de sessie nog, dan telt de rest ervan ook niet mee.",
+      "fields": {
+        "session_id": {
+          "name": "Sessie",
+          "description": "Het id uit het attribuut 'sessions' van de sessie-sensor, of 'last' voor de lopende/laatste sessie."
+        }
+      }
     }
   },
   "options": {
     "step": {
-      "init": {
-        "title": "Prijsvoorspellingen",
-        "description": "Vul de gepubliceerde day-ahead prijzen optioneel aan met EPEX-prijsvoorspellingen uit externe bronnen, tot 7 dagen vooruit. Standaard uit: staat dit uit, dan verandert er niets (geen extra API-calls, geen extra entiteiten).",
-        "data": {
-          "forecast_enabled": "Prijsvoorspellingen aanzetten"
-        }
-      },
       "forecast": {
         "title": "Instellingen voorspellingen",
         "description": "Voorspellingen worden altijd als kale EPEX-prijs opgehaald; de formule van je leverancier (opslag, energiebelasting, btw) past DynTarNL zelf toe. Gepubliceerde prijzen winnen altijd van een voorspelling.",
@@ -140,6 +153,30 @@
           "forecast_bias_correction": "Trek de gemeten systematische fout per bron af vóór het middelen.",
           "forecast_window_days": "Over zoveel recente dagen wordt de nauwkeurigheid gemeten.",
           "forecast_cheapest_hours": "Voor de sensor 'cheapest block start' (komende 48 uur, inclusief voorspellingen)."
+        }
+      },
+      "forecast_toggle": {
+        "title": "Prijsvoorspellingen",
+        "description": "Vul de gepubliceerde day-ahead prijzen optioneel aan met EPEX-prijsvoorspellingen uit externe bronnen, tot 7 dagen vooruit. Standaard uit: staat dit uit, dan verandert er niets (geen extra API-calls, geen extra entiteiten).",
+        "data": {
+          "forecast_enabled": "Prijsvoorspellingen aanzetten"
+        }
+      },
+      "init": {
+        "title": "DynTarNL-opties",
+        "menu_options": {
+          "forecast_toggle": "Prijsvoorspellingen",
+          "ev": "Laadkosten EV"
+        }
+      },
+      "ev": {
+        "title": "Laadkosten EV",
+        "description": "Houd bij wat het laden van je EV kost, afgerekend tegen de all-in prijs van het moment waarop de energie werd gebruikt. Kies de energieteller van de lader (kWh, totaal of per sessie; het nauwkeurigst) of de vermogen-sensor (W). Leeg laten = uit.",
+        "data": {
+          "ev_charger_sensor": "Sensor van de lader"
+        },
+        "data_description": {
+          "ev_charger_sensor": "Een sessie-teller (bijv. ..._charging_session_energy) geeft ook zuivere kosten per laadsessie."
         }
       }
     },

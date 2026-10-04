@@ -96,7 +96,7 @@ def no_network(monkeypatch):
 
 def test_options_off_saves_immediately_and_keeps_rest():
     flow = _flow({**FORECAST_DEFAULTS, CONF_FC_PROVIDERS: [B]})
-    result = asyncio.run(flow.async_step_init({CONF_FORECAST: False}))
+    result = asyncio.run(flow.async_step_forecast_toggle({CONF_FORECAST: False}))
     assert result["type"] == "create_entry"
     assert result["data"][CONF_FORECAST] is False
     assert result["data"][CONF_FC_PROVIDERS] == [B]
@@ -104,7 +104,7 @@ def test_options_off_saves_immediately_and_keeps_rest():
 
 def test_options_full_flow(no_network):
     flow = _flow()
-    assert asyncio.run(flow.async_step_init({CONF_FORECAST: True}))["step_id"] == "forecast"
+    assert asyncio.run(flow.async_step_forecast_toggle({CONF_FORECAST: True}))["step_id"] == "forecast"
     assert asyncio.run(flow.async_step_forecast(_general()))["step_id"] == "provider_settings"
     result = asyncio.run(
         flow.async_step_provider_settings(
@@ -124,14 +124,14 @@ def test_options_full_flow(no_network):
 
 def test_options_require_a_provider():
     flow = _flow()
-    asyncio.run(flow.async_step_init({CONF_FORECAST: True}))
+    asyncio.run(flow.async_step_forecast_toggle({CONF_FORECAST: True}))
     result = asyncio.run(flow.async_step_forecast(_general(**{CONF_FC_PROVIDERS: []})))
     assert result["errors"] == {CONF_FC_PROVIDERS: "no_providers"}
 
 
 def test_accuracy_weighting_needs_accuracy():
     flow = _flow()
-    asyncio.run(flow.async_step_init({CONF_FORECAST: True}))
+    asyncio.run(flow.async_step_forecast_toggle({CONF_FORECAST: True}))
     result = asyncio.run(flow.async_step_forecast(_general(**{CONF_FC_ACCURACY: False})))
     assert result["errors"] == {CONF_FC_WEIGHTING: "weighting_needs_accuracy"}
 
@@ -142,7 +142,7 @@ def test_provider_validation_error_is_shown(monkeypatch):
 
     monkeypatch.setattr(PROVIDERS[A], "async_validate", bad)
     flow = _flow()
-    asyncio.run(flow.async_step_init({CONF_FORECAST: True}))
+    asyncio.run(flow.async_step_forecast_toggle({CONF_FORECAST: True}))
     asyncio.run(flow.async_step_forecast(_general(**{CONF_FC_PROVIDERS: [A]})))
     result = asyncio.run(flow.async_step_provider_settings({"forecast_epexpredictor_url": "http://nope"}))
     assert result["errors"] == {"forecast_epexpredictor_url": "cannot_connect"}
@@ -236,7 +236,7 @@ def test_deselected_provider_entities_are_removed(setup_env):
 def test_api_key_can_be_cleared(no_network):
     """Een leeggemaakt optioneel veld stuurt HA niet mee; dat moet 'leeg' worden."""
     flow = _flow({**FORECAST_DEFAULTS, "forecast_energypriceforecast_api_key": "oude-key"})
-    asyncio.run(flow.async_step_init({CONF_FORECAST: True}))
+    asyncio.run(flow.async_step_forecast_toggle({CONF_FORECAST: True}))
     form = asyncio.run(flow.async_step_forecast(_general()))
     key_field = next(k for k in form["data_schema"].schema if k == "forecast_energypriceforecast_api_key")
     assert key_field.default is None  # geen default die HA weer invult

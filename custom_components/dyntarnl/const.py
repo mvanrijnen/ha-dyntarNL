@@ -153,3 +153,7 @@ FC_SERIES_MAX_AGE_H = 48           # oudere providerreeks telt niet meer mee
 FC_SNAPSHOT_MAX_AGE_D = 8          # niet-afgerekende snapshots daarna weg
 FC_ERROR_CLIP = 0.15               # €/kWh: fout per kwartier begrensd (uitschieters)
 FC_CHEAPEST_LOOKAHEAD_H = 48
+
+# --- Laadkosten EV (optioneel, standaard UIT) -------------------------------
+# Leeg = uit. Een kWh-teller (totaal of per sessie) of een vermogen-sensor (W/kW).
+CONF_EV_SENSOR = "ev_charger_sensor"

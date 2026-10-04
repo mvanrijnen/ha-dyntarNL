@@ -25,3 +25,27 @@ get_prices:
           min: 1
           max: 168
           unit_of_measurement: h
+
+reset_ev_cost:
+  fields:
+    period:
+      required: true
+      default: session
+      selector:
+        select:
+          options:
+            - session
+            - day
+            - month
+            - quarter
+            - year
+            - total
+            - all
+
+delete_ev_session:
+  fields:
+    session_id:
+      default: last
+      example: "2026-10-04T13:30"
+      selector:
+        text:

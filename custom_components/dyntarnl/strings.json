@@ -82,17 +82,30 @@
           "description": "Only quarters up to this many hours from now."
         }
       }
+    },
+    "reset_ev_cost": {
+      "name": "Reset EV charging cost",
+      "description": "Sets one of the EV charging cost counters (or all of them) back to 0.",
+      "fields": {
+        "period": {
+          "name": "Period",
+          "description": "session, day, month, quarter, year, total or all."
+        }
+      }
+    },
+    "delete_ev_session": {
+      "name": "Delete EV charging session",
+      "description": "Removes a charging session (e.g. another car) from all EV cost counters. While the session is still running, the rest of it is not counted either.",
+      "fields": {
+        "session_id": {
+          "name": "Session",
+          "description": "The id from the 'sessions' attribute of the session sensor, or 'last' for the running/most recent session."
+        }
+      }
     }
   },
   "options": {
     "step": {
-      "init": {
-        "title": "Price forecasts",
-        "description": "Optionally extend the published day-ahead prices with EPEX price forecasts from external sources, up to 7 days ahead. Off by default: when off, nothing changes (no extra API calls, no extra entities).",
-        "data": {
-          "forecast_enabled": "Enable price forecasts"
-        }
-      },
       "forecast": {
         "title": "Forecast settings",
         "description": "Forecasts are always fetched as the bare EPEX price; your supplier's formula (markup, energy tax, VAT) is applied by DynTarNL. Published prices always win over forecasts.",
@@ -140,6 +153,30 @@
           "forecast_bias_correction": "Subtract each source's measured systematic error before averaging.",
           "forecast_window_days": "Accuracy is measured over this many most recent days.",
           "forecast_cheapest_hours": "Used by the 'cheapest block start' sensor (next 48 hours, forecasts included)."
+        }
+      },
+      "forecast_toggle": {
+        "title": "Price forecasts",
+        "description": "Optionally extend the published day-ahead prices with EPEX price forecasts from external sources, up to 7 days ahead. Off by default: when off, nothing changes (no extra API calls, no extra entities).",
+        "data": {
+          "forecast_enabled": "Enable price forecasts"
+        }
+      },
+      "init": {
+        "title": "DynTarNL options",
+        "menu_options": {
+          "forecast_toggle": "Price forecasts",
+          "ev": "EV charging cost"
+        }
+      },
+      "ev": {
+        "title": "EV charging cost",
+        "description": "Track what charging your EV costs, priced at the all-in price of the moment the energy was used. Choose the charger's energy counter (kWh, total or per session; most accurate) or its power sensor (W). Leave empty to turn it off.",
+        "data": {
+          "ev_charger_sensor": "Charger sensor"
+        },
+        "data_description": {
+          "ev_charger_sensor": "A session energy counter (e.g. ..._charging_session_energy) also gives clean per-session costs."
         }
       }
     },
