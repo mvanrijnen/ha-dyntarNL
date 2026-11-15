@@ -83,3 +83,8 @@ bestaande sensoren, attributen of `entity_id`'s.
 - Er is nu een Nederlandse vertaling (`nl.json`), ook voor de bestaande config flow.
 - De CUSTOM-berekening staat nu in één functie, `apply_formula`. De uitkomst is ongewijzigd.
 - Minimaal Home Assistant 2024.12, vanwege de options flow.
+
+### Opgelost
+
+- Een eigen leverancier (*Custom supplier*) toevoegen gaf "Unknown error occurred"; dat zat
+  ook al in 1.0.2 ([#3](https://github.com/mvanrijnen/ha-dyntarNL/issues/3)).
