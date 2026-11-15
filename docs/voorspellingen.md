@@ -1,6 +1,6 @@
 # Prijsvoorspellingen in DynTarNL
 
-Vanaf versie 2.0 kan DynTarNL de gepubliceerde day-ahead stroomprijzen aanvullen met
+Vanaf versie 1.1 kan DynTarNL de gepubliceerde day-ahead stroomprijzen aanvullen met
 **voorspellingen tot 7 dagen vooruit**. Deze pagina legt uit hoe dat werkt, wat je kunt
 instellen, welke entiteiten je krijgt, hoe je de voorspelling in een grafiek zet en hoe je
 die grafiek leest.
@@ -472,7 +472,7 @@ content: |
 
 **Geen voorspel-entiteiten?**
 Controleer bij *Ontwikkelhulpmiddelen → Statussen* of er entiteiten met `dyntarnl_forecast`
-zijn. Zo niet: staat 2.0 erop (na de update herstarten) en heb je *Configureren* helemaal
+zijn. Zo niet: staat 1.1 (of nieuwer) erop (na de update herstarten) en heb je *Configureren* helemaal
 doorlopen tot en met de laatste stap?
 
 **Entiteiten wel, maar geen voorspelling?**

@@ -317,7 +317,7 @@ De prijs-*array* verandert maar een paar keer per dag, dus de integratie is zuin
 
 ## Prijsvoorspellingen (optioneel)
 
-Vanaf 2.0 kan DynTarNL de gepubliceerde day-ahead prijzen aanvullen met **voorspellingen tot
+Vanaf 1.1 kan DynTarNL de gepubliceerde day-ahead prijzen aanvullen met **voorspellingen tot
 7 dagen vooruit**. De optie staat **standaard uit**. Zolang hij uit staat verandert er niets:
 geen extra API-calls, geen extra entiteiten en geen andere sensoren of attributen.
 
