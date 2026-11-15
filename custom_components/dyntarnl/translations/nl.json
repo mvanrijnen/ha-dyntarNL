@@ -122,7 +122,7 @@
         },
         "data_description": {
           "forecast_epexpredictor_url": "Publieke instantie of je eigen (bijv. een lokale container of add-on).",
-          "forecast_energypriceforecast_api_key": "Zonder key is de horizon maximaal 48 uur."
+          "forecast_energypriceforecast_api_key": "Zonder key is de horizon maximaal 48 uur; met een Private Pro-key (https://energypriceforecast.eu/en/private-pro/) 120 uur. Alleen voor privé, niet-commercieel gebruik."
         }
       },
       "advanced": {

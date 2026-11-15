@@ -42,7 +42,7 @@ ontwerp maakt het makkelijk om er later meer toe te voegen.
 | Bron | Horizon | Instellingen |
 | --- | --- | --- |
 | [EpexPredictor](https://github.com/b3nn0/EpexPredictor) | ± 7 dagen, per kwartier | URL instelbaar: de publieke instantie of je eigen (container of add-on) |
-| [Energy Price Forecast EU](https://energypriceforecast.eu) | 48 uur zonder key, 120 uur met key | Optionele API-key |
+| [Energy Price Forecast EU](https://energypriceforecast.eu) | 48 uur zonder key, 120 uur met een [Private Pro](https://energypriceforecast.eu/en/private-pro/)-key | Optionele API-key |
 
 **Altijd de kale prijs, jouw formule.** Van elke bron haalt DynTarNL alleen de kale
 EPEX-prijs op. De opslag- en btw-opties van die diensten gebruiken we bewust niet. Op de kale
@@ -463,6 +463,10 @@ content: |
 - **Ongedocumenteerde API.** Energy Price Forecast EU publiceert geen API-specificatie.
   DynTarNL gebruikt het endpoint van hun eigen Home Assistant-integratie en controleert het
   antwoordformaat. Verandert dat, dan gaat alleen die bron in storing.
+- **Gebruiksvoorwaarden Energy Price Forecast EU.** De maker staat het gebruik vanuit DynTarNL
+  toe voor **privé, niet-commercieel** gebruik, waarbij je installatie de API rechtstreeks
+  bevraagt ([issue #4](https://github.com/mvanrijnen/ha-dyntarNL/issues/4)). Voor een
+  horizon van 120 uur heb je een [Private Pro](https://energypriceforecast.eu/en/private-pro/)-key nodig.
 
 ## Problemen oplossen
 

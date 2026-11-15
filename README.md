@@ -334,7 +334,9 @@ moment, zonder de integratie opnieuw toe te voegen.
     vooruit. De URL is instelbaar, zodat je ook een eigen instantie kunt gebruiken (lokale
     container of add-on).
   - [Energy Price Forecast EU](https://energypriceforecast.eu), markt NL. Zonder API-key
-    maximaal 48 uur, met (optionele) key tot 120 uur.
+    maximaal 48 uur. Met een key van [Private Pro](https://energypriceforecast.eu/en/private-pro/) tot 120 uur. Gebruik is toegestaan
+    voor privé, niet-commercieel gebruik, waarbij je installatie de API zelf rechtstreeks
+    bevraagt (zo werkt DynTarNL).
 - **Altijd de kale EPEX-prijs.** De opslag- en btw-opties van de bronnen worden niet gebruikt.
   DynTarNL past er de formule van jouw leverancier op toe, met **exact dezelfde functie** als
   voor CUSTOM:
@@ -527,7 +529,9 @@ Elk record heeft de velden:
 - Een voorspelling blijft een voorspelling. Gebruik hem om te plannen, niet om af te rekenen.
 - Energy Price Forecast EU heeft geen gedocumenteerde publieke API-spec. DynTarNL gebruikt
   het endpoint van hun eigen HA-integratie en controleert het antwoordformaat. Verandert dat,
-  dan gaat alleen die bron in storing.
+  dan gaat alleen die bron in storing. De maker heeft het gebruik vanuit DynTarNL goedgekeurd
+  voor privé, niet-commercieel gebruik met directe API-toegang
+  ([issue #4](https://github.com/mvanrijnen/ha-dyntarNL/issues/4)).
 
 ## Installatie (HACS)
 
