@@ -115,14 +115,14 @@
       },
       "provider_settings": {
         "title": "Source settings",
-        "description": "Settings per selected source. They are checked with one test call.",
+        "description": "Settings per selected source. They are checked with one test call.\n\nEnergy Price Forecast EU: 48 hours without a key, 120 hours with a [Private Pro]({private_pro_url}) key. Private, non-commercial use only.",
         "data": {
           "forecast_epexpredictor_url": "EpexPredictor URL",
           "forecast_energypriceforecast_api_key": "Energy Price Forecast EU API key (optional)"
         },
         "data_description": {
           "forecast_epexpredictor_url": "Public instance or your own (e.g. a local container or add-on).",
-          "forecast_energypriceforecast_api_key": "Without a key the horizon is at most 48 hours; a Private Pro key (https://energypriceforecast.eu/en/private-pro/) gives 120 hours. Private, non-commercial use only."
+          "forecast_energypriceforecast_api_key": "Without a key the horizon is at most 48 hours."
         }
       },
       "advanced": {

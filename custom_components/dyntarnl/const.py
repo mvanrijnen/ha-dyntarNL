@@ -119,6 +119,8 @@ ENSEMBLE = "ensemble"
 
 EPEXPREDICTOR_URL = "https://epexpredictor.batzill.com"
 EPF_URL = "https://api.energypriceforecast.eu/api/v1/home-assistant/prices"
+# Voor de uitleg in de options flow (hassfest staat geen URL's in vertalingen toe).
+EPF_PRIVATE_PRO_URL = "https://energypriceforecast.eu/en/private-pro/"
 
 FORECAST_DEFAULTS: dict = {
     CONF_FORECAST: False,

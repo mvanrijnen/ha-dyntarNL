@@ -35,6 +35,7 @@ from .const import (
     CONF_FC_WEIGHTING,
     CONF_FC_WINDOW,
     CONF_FORECAST,
+    EPF_PRIVATE_PRO_URL,
     FC_MAX_HORIZON,
     FORECAST_DEFAULTS,
     WEIGHTING_ACCURACY,
@@ -258,7 +259,10 @@ class DynTarNLOptionsFlow(OptionsFlow):
                 return await self.async_step_advanced()
 
         return self.async_show_form(
-            step_id="provider_settings", data_schema=vol.Schema(fields), errors=errors
+            step_id="provider_settings",
+            data_schema=vol.Schema(fields),
+            errors=errors,
+            description_placeholders={"private_pro_url": EPF_PRIVATE_PRO_URL},
         )
 
     async def async_step_advanced(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
