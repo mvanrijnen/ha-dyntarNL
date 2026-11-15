@@ -68,8 +68,44 @@ def _euro(maximum: float) -> NumberSelector:
     )
 
 
+def _supplier_schema(default: str | None = None) -> vol.Schema:
+    options = [SelectOptionDict(value=s.key, label=s.name) for s in SUPPLIERS if s.implemented]
+    key = vol.Required(CONF_SUPPLIER, default=default) if default else vol.Required(CONF_SUPPLIER)
+    return vol.Schema(
+        {key: SelectSelector(SelectSelectorConfig(options=options, mode=SelectSelectorMode.DROPDOWN))}
+    )
+
+
+def _custom_schema(current: dict[str, Any] | None = None) -> vol.Schema:
+    """CUSTOM-tarieven; bij opnieuw configureren met de huidige waarden ingevuld."""
+    c = current or {}
+    return vol.Schema(
+        {
+            vol.Required(CONF_VAT, default=c.get(CONF_VAT, DEFAULT_VAT)): NumberSelector(
+                NumberSelectorConfig(
+                    min=0, max=100, step=1, mode=NumberSelectorMode.BOX, unit_of_measurement="%"
+                )
+            ),
+            vol.Required(CONF_MARKUP_ELEC, default=c.get(CONF_MARKUP_ELEC, 0.0)): _euro(1),
+            vol.Required(CONF_MARKUP_GAS, default=c.get(CONF_MARKUP_GAS, 0.0)): _euro(2),
+            vol.Required(CONF_TAX_ELEC, default=c.get(CONF_TAX_ELEC, DEFAULT_TAX_ELEC)): _euro(1),
+            vol.Required(CONF_TAX_GAS, default=c.get(CONF_TAX_GAS, DEFAULT_TAX_GAS)): _euro(2),
+            vol.Required(
+                CONF_EPEX_SOURCE, default=c.get(CONF_EPEX_SOURCE, DEFAULT_EPEX_SOURCE)
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    options=list(EPEX_SOURCES),
+                    translation_key="epex_source",
+                    mode=SelectSelectorMode.DROPDOWN,
+                )
+            ),
+        }
+    )
+
+
 class DynTarNLConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Leverancier kiezen; bij CUSTOM extra velden."""
+    """Leverancier kiezen; bij CUSTOM extra velden. Later te wijzigen via
+    'Opnieuw configureren' (reconfigure): entiteiten, historie en opties blijven."""
 
     VERSION = 1
     # 1.2: voorspel-opties (standaard UIT). Bewust een minor-versie: terug naar
@@ -98,19 +134,7 @@ class DynTarNLConfigFlow(ConfigFlow, domain=DOMAIN):
                 options=dict(FORECAST_DEFAULTS),
             )
 
-        options = [
-            SelectOptionDict(value=s.key, label=s.name)
-            for s in SUPPLIERS
-            if s.implemented
-        ]
-        schema = vol.Schema(
-            {
-                vol.Required(CONF_SUPPLIER): SelectSelector(
-                    SelectSelectorConfig(options=options, mode=SelectSelectorMode.DROPDOWN)
-                )
-            }
-        )
-        return self.async_show_form(step_id="user", data_schema=schema)
+        return self.async_show_form(step_id="user", data_schema=_supplier_schema())
 
     async def async_step_custom(
         self, user_input: dict[str, Any] | None = None
@@ -122,27 +146,49 @@ class DynTarNLConfigFlow(ConfigFlow, domain=DOMAIN):
                 options=dict(FORECAST_DEFAULTS),
             )
 
-        schema = vol.Schema(
-            {
-                vol.Required(CONF_VAT, default=DEFAULT_VAT): NumberSelector(
-                    NumberSelectorConfig(
-                        min=0, max=100, step=1, mode=NumberSelectorMode.BOX, unit_of_measurement="%"
-                    )
-                ),
-                vol.Required(CONF_MARKUP_ELEC, default=0.0): _euro(1),
-                vol.Required(CONF_MARKUP_GAS, default=0.0): _euro(2),
-                vol.Required(CONF_TAX_ELEC, default=DEFAULT_TAX_ELEC): _euro(1),
-                vol.Required(CONF_TAX_GAS, default=DEFAULT_TAX_GAS): _euro(2),
-                vol.Required(CONF_EPEX_SOURCE, default=DEFAULT_EPEX_SOURCE): SelectSelector(
-                    SelectSelectorConfig(
-                        options=list(EPEX_SOURCES),
-                        translation_key="epex_source",
-                        mode=SelectSelectorMode.DROPDOWN,
-                    )
-                ),
-            }
+        return self.async_show_form(step_id="custom", data_schema=_custom_schema())
+
+    # --- Opnieuw configureren: andere leverancier of andere CUSTOM-tarieven ------
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Leverancier wijzigen zonder de integratie te verwijderen.
+
+        Dezelfde config entry blijft bestaan, dus entity_id's, historie en de
+        voorspel-opties blijven behouden; de entry wordt alleen herladen.
+        """
+        entry = self._get_reconfigure_entry()
+        if user_input is not None:
+            self._supplier = user_input[CONF_SUPPLIER]
+            supplier = supplier_by_key(self._supplier)
+            if supplier and supplier.platform == PLATFORM_CUSTOM:
+                return await self.async_step_reconfigure_custom()
+            return self.async_update_reload_and_abort(
+                entry,
+                title=supplier.name if supplier else "DynTarNL",
+                data={CONF_SUPPLIER: self._supplier},
+            )
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=_supplier_schema(entry.data.get(CONF_SUPPLIER)),
         )
-        return self.async_show_form(step_id="custom", data_schema=schema)
+
+    async def async_step_reconfigure_custom(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        entry = self._get_reconfigure_entry()
+        if user_input is not None:
+            return self.async_update_reload_and_abort(
+                entry,
+                title="Custom supplier",
+                data={CONF_SUPPLIER: self._supplier, **user_input},
+            )
+        # Was het al CUSTOM, dan de huidige tarieven voorinvullen.
+        return self.async_show_form(
+            step_id="reconfigure_custom", data_schema=_custom_schema(dict(entry.data))
+        )
 
 
 def _number(minimum: float, maximum: float, step: float, unit: str | None = None) -> NumberSelector:

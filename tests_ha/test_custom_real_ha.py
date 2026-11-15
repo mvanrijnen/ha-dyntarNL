@@ -140,3 +140,64 @@ async def test_unload_and_remove(hass, prices):
     assert entry.state is ConfigEntryState.NOT_LOADED
     await hass.config_entries.async_remove(entry.entry_id)
     await hass.async_block_till_done()
+
+
+# --- Opnieuw configureren ---------------------------------------------------------
+
+ESSENT = "https://www.essent.nl/api/public/dynamicpricing/dynamic-prices/v1"
+
+
+async def _reconfigure(hass, entry):
+    from homeassistant.config_entries import SOURCE_RECONFIGURE
+
+    return await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_RECONFIGURE, "entry_id": entry.entry_id}
+    )
+
+
+async def test_reconfigure_custom_to_essent_keeps_entities(hass, prices, aioclient_mock):
+    aioclient_mock.get(ESSENT, json=json.loads((FIX / "essent.json").read_text(encoding="utf-8")))
+    entry = await _add_custom(hass)
+    entity_id = "sensor.dyntarnl_e_all_in_now"
+    from homeassistant.helpers import entity_registry as er
+
+    unique_before = er.async_get(hass).async_get(entity_id).unique_id
+
+    result = await _reconfigure(hass, entry)
+    assert result["type"] is FlowResultType.FORM and result["step_id"] == "reconfigure"
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"supplier": "essent"})
+    assert result["type"] is FlowResultType.ABORT and result["reason"] == "reconfigure_successful"
+    await hass.async_block_till_done()
+
+    assert entry.state is ConfigEntryState.LOADED
+    assert entry.data == {"supplier": "essent"} and entry.title == "Essent"
+    assert entry.options["forecast_enabled"] is False  # opties behouden
+    assert len(hass.config_entries.async_entries(DOMAIN)) == 1  # geen tweede entry
+    assert er.async_get(hass).async_get(entity_id).unique_id == unique_before
+    state = hass.states.get(entity_id)  # zelfde entity_id, nu met Essent-prijzen
+    assert state is not None and state.state not in ("unknown", "unavailable")
+    essent = json.loads((FIX / "essent.json").read_text(encoding="utf-8"))
+    day = next(d for d in essent["prices"] if d["date"] == "2026-08-17")
+    row = next(t for t in day["electricity"]["tariffs"] if t["startDateTime"].startswith("2026-08-17T14:00"))
+    assert float(state.state) == pytest.approx(row["totalAmount"], abs=1e-5)
+
+
+async def test_reconfigure_custom_tariffs_are_prefilled_and_applied(hass, prices):
+    entry = await _add_custom(hass)
+    result = await _reconfigure(hass, entry)
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"supplier": "custom"})
+    assert result["step_id"] == "reconfigure_custom"
+    # Huidige tarieven staan voorgevuld.
+    defaults = {str(k): k.default() for k in result["data_schema"].schema if hasattr(k, "default")}
+    assert defaults["markup_electricity"] == 0.02
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {**CUSTOM_INPUT, "markup_electricity": 0.03}
+    )
+    assert result["type"] is FlowResultType.ABORT and result["reason"] == "reconfigure_successful"
+    await hass.async_block_till_done()
+
+    row = next(r for r in prices["prices"] if r["from"].startswith("2026-08-17T14:00"))
+    expected = (float(row["price"]) + 0.03 + 0.09161) * 1.21
+    assert float(hass.states.get("sensor.dyntarnl_e_all_in_now").state) == pytest.approx(expected, abs=1e-5)
+    assert entry.data["markup_electricity"] == 0.03

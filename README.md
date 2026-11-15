@@ -566,6 +566,19 @@ herstart Home Assistant. Voeg daarna de integratie toe met de knop hieronder (of
 
 Of handmatig: kopieer `custom_components/dyntarnl/` naar je Home Assistant `config/custom_components/` en herstart.
 
+### Leverancier of tarieven wijzigen
+
+Overgestapt, of veranderen je eigen tarieven? Je hoeft de integratie niet te verwijderen:
+
+*Instellingen → Apparaten & Services → DynTarNL → ⋮ →* **Opnieuw configureren**.
+
+- Kies een andere leverancier, of *Custom supplier (manual)* om je opslag, energiebelasting en
+  btw aan te passen. Je huidige tarieven staan dan al ingevuld.
+- Je entiteiten, hun **historie** en je voorspel-instellingen blijven behouden. Alleen de bron
+  van de prijzen verandert, vanaf het moment dat je opslaat.
+
+De voorspellingen stel je apart in via **Configureren**.
+
 ## Ontwikkeling / tests
 
 ```bash
@@ -575,6 +588,15 @@ pytest
 
 De tests draaien zonder HA-installatie (Home Assistant wordt gestubd) en gebruiken vastgelegde
 JSON-fixtures — geen live API-calls.
+
+Daarnaast draait `tests_ha/` de integratie in een **echte** Home Assistant: toevoegen (ook
+Custom), opnieuw configureren, opties, sensoren en services. Dat werkt op Linux, macOS of
+WSL, niet op Windows zelf:
+
+```bash
+pip install pytest-homeassistant-custom-component
+pytest -c tests_ha/pytest.ini tests_ha
+```
 
 ## Tools: prijzen naar CSV (PowerShell)
 

@@ -22,10 +22,33 @@
         "data_description": {
           "epex_source": "Waar de kale beursprijs vandaan komt. Voor stroom is die overal gelijk; voor gas verschilt hij licht per bron. Twijfel je? Laat easyEnergy staan."
         }
+      },
+      "reconfigure": {
+        "title": "Leverancier wijzigen",
+        "description": "Kies een andere energieleverancier, of 'Custom supplier (manual)' om je eigen tarieven aan te passen. Je entiteiten, historie en voorspel-instellingen blijven behouden.",
+        "data": {
+          "supplier": "Leverancier"
+        }
+      },
+      "reconfigure_custom": {
+        "title": "Eigen leverancier: tarieven",
+        "description": "Handig voor leveranciers zonder publieke API, zoals Vattenfall, Eneco, Tibber, Greenchoice, Zonneplan, ENGIE, DELTA, Vandebron, OXXIO en anderen.\n\nDe integratie haalt de kale EPEX-beursprijs op en rekent de all-in prijs zelf uit. Vul je tarieven exclusief btw in; de btw komt erbovenop.\n\nall-in = (EPEX + opslag + energiebelasting) × (1 + btw%)",
+        "data": {
+          "vat_percentage": "Btw (%)",
+          "markup_electricity": "Opslag stroom (€/kWh, excl. btw)",
+          "markup_gas": "Opslag gas (€/m³, excl. btw)",
+          "energy_tax_electricity": "Energiebelasting stroom (€/kWh, excl. btw)",
+          "energy_tax_gas": "Energiebelasting gas (€/m³, excl. btw)",
+          "epex_source": "Bron EPEX-beursprijs"
+        },
+        "data_description": {
+          "epex_source": "Waar de kale beursprijs vandaan komt. Voor stroom is die overal gelijk; voor gas verschilt hij licht per bron. Twijfel je? Laat easyEnergy staan."
+        }
       }
     },
     "abort": {
-      "already_configured": "Deze leverancier is al ingesteld."
+      "already_configured": "Deze leverancier is al ingesteld.",
+      "reconfigure_successful": "De instellingen zijn bijgewerkt."
     }
   },
   "selector": {

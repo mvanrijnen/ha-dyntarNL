@@ -11,6 +11,8 @@ oudere versies staan op de [releases-pagina](https://github.com/mvanrijnen/ha-dy
   omgerekend met de formule van jouw eigen leverancier, met een gewogen ensemble en een
   automatische meting van hoe nauwkeurig elke bron is.
 - **Nieuw: instellingen achteraf aanpassen** via *Configureren* op de integratie (options flow).
+- **Nieuw: leverancier of eigen tarieven wijzigen** via *Opnieuw configureren*, zonder de
+  integratie te verwijderen. Entiteiten en hun historie blijven behouden.
 - **Nieuw: service `dyntarnl.get_prices`** voor de volledige prijsreeks per kwartier.
 - **Nieuw: Nederlandse vertaling** van de configuratieschermen.
 - **Opgelost:** een eigen leverancier (*Custom supplier*) toevoegen gaf "Unknown error occurred"
@@ -105,6 +107,14 @@ opgeruimd.
   de prijs van **nu** in de header en de legenda.
 - Ook als tabel: een Markdown-kaart met een overzicht per dag en per uur, inclusief de marge
   van de voorspelling.
+
+### Leverancier of tarieven wijzigen
+
+- *Instellingen → Apparaten & Services → DynTarNL → ⋮ → Opnieuw configureren*: kies een
+  andere leverancier, of pas bij *Custom supplier* je opslag, energiebelasting, btw en
+  EPEX-bron aan. Je huidige tarieven staan al ingevuld.
+- Het blijft dezelfde integratie: entity_id's, historie, statistieken en voorspel-instellingen
+  blijven behouden. Alleen de bron van de prijzen verandert, vanaf dat moment.
 
 ### Opgelost
 

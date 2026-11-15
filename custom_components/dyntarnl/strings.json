@@ -22,10 +22,33 @@
         "data_description": {
           "epex_source": "Where the bare market price comes from. For electricity it is identical everywhere; for gas it differs slightly per source. Unsure? Leave easyEnergy."
         }
+      },
+      "reconfigure": {
+        "title": "Change supplier",
+        "description": "Choose a different energy supplier, or 'Custom supplier (manual)' to change your own tariffs. Your entities, history and forecast settings are kept.",
+        "data": {
+          "supplier": "Supplier"
+        }
+      },
+      "reconfigure_custom": {
+        "title": "Custom supplier: tariffs",
+        "description": "Useful for suppliers without a public API, such as Vattenfall, Eneco, Tibber, Greenchoice, Zonneplan, ENGIE, DELTA, Vandebron, OXXIO and others.\n\nThe integration fetches the bare EPEX market price and computes the all-in price itself. Enter your tariffs excluding VAT; VAT is applied on top.\n\nall-in = (EPEX + markup + energy tax) × (1 + VAT%)",
+        "data": {
+          "vat_percentage": "VAT (%)",
+          "markup_electricity": "Markup electricity (€/kWh, excl. VAT)",
+          "markup_gas": "Markup gas (€/m³, excl. VAT)",
+          "energy_tax_electricity": "Energy tax electricity (€/kWh, excl. VAT)",
+          "energy_tax_gas": "Energy tax gas (€/m³, excl. VAT)",
+          "epex_source": "EPEX market-price source"
+        },
+        "data_description": {
+          "epex_source": "Where the bare market price comes from. For electricity it is identical everywhere; for gas it differs slightly per source. Unsure? Leave easyEnergy."
+        }
       }
     },
     "abort": {
-      "already_configured": "This supplier is already configured."
+      "already_configured": "This supplier is already configured.",
+      "reconfigure_successful": "The settings have been updated."
     }
   },
   "selector": {

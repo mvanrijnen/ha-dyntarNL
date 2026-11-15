@@ -72,7 +72,9 @@ Data flows: **supplier registry → platform fetcher → shared `Slot` model →
   function taking `(EnergyData, datetime, PriceFn)`.
 - `__init__.py` — owns *when* data is fetched (see below), registers the `dyntarnl.refresh`
   and `dyntarnl.get_prices` services, and migrates config entries (1.1 → 1.2).
-- `config_flow.py` — supplier choice plus an options flow that only holds the forecast options.
+- `config_flow.py` — supplier choice (+ `reconfigure`/`reconfigure_custom` to switch supplier or
+  edit Custom tariffs on the same entry, so entities/history survive) plus an options flow that
+  only holds the forecast options.
 - `forecast/` — optional EPEX forecasts (off by default; `CONF_FORECAST`). Electricity only,
   per quarter hour, internally UTC:
   - `providers/` — one `ForecastProvider` subclass per source, registered in `PROVIDERS`. A new
