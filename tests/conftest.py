@@ -155,7 +155,14 @@ def _install_ha_stubs() -> None:
             raise ValueError(f"selector-config met None: {bad}")
         return dict(k)
 
-    selector.NumberSelectorConfig = _strict_config
+    def _number_config(**k):
+        # Zoals HA: step moet >= 0.001 zijn, of "any" (issue #3).
+        step = k.get("step", 1)
+        if step != "any" and float(step) < 0.001:
+            raise ValueError(f"ongeldige NumberSelector-step: {step}")
+        return _strict_config(**k)
+
+    selector.NumberSelectorConfig = _number_config
     selector.SelectSelectorConfig = _strict_config
     selector.TextSelectorConfig = _strict_config
     selector.NumberSelectorMode = type("NumberSelectorMode", (), {"BOX": "box", "SLIDER": "slider"})

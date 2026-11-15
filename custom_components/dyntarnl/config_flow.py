@@ -61,7 +61,8 @@ from .forecast.providers import PROVIDERS
 def _euro(maximum: float) -> NumberSelector:
     return NumberSelector(
         NumberSelectorConfig(
-            min=0, max=maximum, step=0.00001, mode=NumberSelectorMode.BOX, unit_of_measurement="€"
+            # HA accepteert step >= 0.001 of "any"; tarieven hebben 5 decimalen nodig.
+            min=0, max=maximum, step="any", mode=NumberSelectorMode.BOX, unit_of_measurement="€"
         )
     )
 

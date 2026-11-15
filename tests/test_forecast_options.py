@@ -244,3 +244,18 @@ def test_api_key_can_be_cleared(no_network):
     asyncio.run(flow.async_step_provider_settings({"forecast_epexpredictor_url": "https://epexpredictor.batzill.com"}))
     result = asyncio.run(flow.async_step_advanced(dict(ADVANCED)))
     assert result["data"]["forecast_energypriceforecast_api_key"] == ""
+
+
+def test_custom_supplier_form_opens():
+    """Issue #3: het CUSTOM-formulier gaf 'Unknown error occurred' (step=0.00001)."""
+    flow = DynTarNLConfigFlow()
+    flow._supplier = "custom"
+    result = asyncio.run(flow.async_step_custom())
+    assert result["type"] == "form" and result["step_id"] == "custom"
+
+
+def test_all_option_forms_build():
+    """Elke stap van de options flow moet een geldig formulier opleveren."""
+    flow = _flow()
+    for step in (flow.async_step_init, flow.async_step_forecast, flow.async_step_advanced):
+        assert asyncio.run(step())["type"] == "form"
