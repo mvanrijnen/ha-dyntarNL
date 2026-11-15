@@ -16,3 +16,16 @@ jobs:
           python-version: "3.13"
       - run: pip install pytest
       - run: pytest
+
+  # Dezelfde integratie in een ECHTE Home Assistant: config flow (incl. Custom supplier),
+  # options flow, opzetten, sensoren en services. Vangt o.a. selector-validatie (#3).
+  real-ha:
+    name: pytest (echte Home Assistant)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install pytest-homeassistant-custom-component
+      - run: pytest -c tests_ha/pytest.ini tests_ha

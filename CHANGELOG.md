@@ -14,7 +14,8 @@ oudere versies staan op de [releases-pagina](https://github.com/mvanrijnen/ha-dy
 - **Nieuw: service `dyntarnl.get_prices`** voor de volledige prijsreeks per kwartier.
 - **Nieuw: Nederlandse vertaling** van de configuratieschermen.
 - **Opgelost:** een eigen leverancier (*Custom supplier*) toevoegen gaf "Unknown error occurred"
-  ([#3](https://github.com/mvanrijnen/ha-dyntarNL/issues/3)).
+  ([#3](https://github.com/mvanrijnen/ha-dyntarNL/issues/3)), en Frank Energie gaf geen prijzen
+  meer door een gewijzigde API van Frank.
 
 **Bestaand gedrag blijft ongewijzigd.** De voorspellingen staan standaard uit. Dan zijn er geen
 extra API-calls en geen extra entiteiten, en bestaande sensoren, attributen en `entity_id`'s
@@ -110,6 +111,9 @@ opgeruimd.
 - Een eigen leverancier (*Custom supplier*) toevoegen gaf "Unknown error occurred". Dat zat ook
   al in 1.0.2 ([#3](https://github.com/mvanrijnen/ha-dyntarNL/issues/3)). Dank aan @hbvdh voor
   de analyse.
+- **Frank Energie** gaf geen prijzen meer: Frank weigert sinds kort de oude prijsquery
+  ("Graphql validation error"). DynTarNL gebruikt nu de nieuwe `marketPrices`-query. Dit
+  raakte ook Custom met Frank als bron voor de beursprijs.
 
 ### Overig
 

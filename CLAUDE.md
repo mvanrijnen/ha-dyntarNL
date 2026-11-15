@@ -23,6 +23,11 @@ CI (`.github/workflows/`): `pytest` on Python 3.13, plus hassfest and the HACS a
 The HACS action runs with no `ignore:` — it passes on the in-integration `brand/` directory
 (see below), which is also a precondition for the hacs/default store listing.
 
+`tests_ha/` runs the integration in a **real** Home Assistant (config flow incl. Custom,
+options flow, setup, sensors, services) via pytest-homeassistant-custom-component:
+`pytest -c tests_ha/pytest.ini tests_ha`. HA does not run on native Windows (no `fcntl`);
+use WSL or CI (job `real-ha`).
+
 There is no linter/formatter configured. Tests are the only gate.
 
 ## GitHub

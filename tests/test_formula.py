@@ -26,7 +26,7 @@ def _patch_sources(monkeypatch, load_fixture, now):
         return essent
 
     async def fake_post(session, url, body):
-        m = re.search(r'startDate:"(\d{4}-\d\d-\d\d)"', body["query"])
+        m = re.fullmatch(r"(\d{4}-\d\d-\d\d)", body["variables"]["date"])
         return frank if m and m.group(1) == today else {"data": {}}
 
     monkeypatch.setattr(src, "_get_json", fake_get)

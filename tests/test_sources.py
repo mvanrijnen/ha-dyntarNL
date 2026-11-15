@@ -3,6 +3,8 @@
 import asyncio
 import re
 
+import pytest
+
 import dyntarnl.sources as src
 from dyntarnl.prices import slot_at
 
@@ -82,7 +84,7 @@ def test_frank_parser(monkeypatch, load_fixture, now):
     today = now.strftime("%Y-%m-%d")
 
     async def fake_post(session, url, body):
-        match = re.search(r'startDate:"(\d{4}-\d\d-\d\d)"', body["query"])
+        match = re.fullmatch(r"(\d{4}-\d\d-\d\d)", body["variables"]["date"])
         # alleen 'vandaag' heeft data in de fixture; andere dagen leeg
         return payload if match and match.group(1) == today else {"data": {}}
 
@@ -98,7 +100,7 @@ def test_frank_parser(monkeypatch, load_fixture, now):
     # en energyTaxPrice zijn AL incl. btw (geen extra btw eroverheen rekenen).
     raw = next(
         r
-        for r in payload["data"]["marketPricesElectricity"]
+        for r in payload["data"]["marketPrices"]["electricityPrices"]
         if src.parse_dt(r["from"]).hour == now.hour
         and src.parse_dt(r["from"]).date() == now.date()
     )
@@ -110,3 +112,31 @@ def test_frank_parser(monkeypatch, load_fixture, now):
     )
     assert abs(cur.total - expected) < 1e-5
     assert abs(cur.fee - float(raw["sourcingMarkupPrice"])) < 1e-9
+
+
+def test_frank_new_api_shape(monkeypatch, load_fixture, at_time):
+    """Echte respons van de nieuwe Frank-API (marketPrices, 16-11-2026, PT60M)."""
+    from datetime import datetime, timedelta, timezone
+
+    payload = load_fixture("frank_market_prices_live.json")
+    sent = []
+
+    async def fake_post(session, url, body):
+        sent.append(body)
+        return payload if body["variables"]["date"] == "2026-11-16" else {"data": {"marketPrices": None}}
+
+    at_time(datetime(2026, 11, 16, 12, tzinfo=timezone(timedelta(hours=1))))
+    monkeypatch.setattr(src, "_post_json", fake_post)
+    data = _run(src.fetch_frank(None))
+
+    assert {b["variables"]["resolution"] for b in sent} == {"PT60M"}
+    assert [b["variables"]["date"] for b in sent] == ["2026-11-15", "2026-11-16", "2026-11-17"]
+    assert "marketPricesElectricity" not in sent[0]["query"]  # oude query wordt geweigerd
+    # De stub rekent met een vaste +02:00, dus tel alle dagen samen.
+    for energy in ("electricity", "gas"):
+        ed = data[energy]
+        assert len((ed.yesterday or []) + ed.today + (ed.tomorrow or [])) == 24
+    slots = (data["electricity"].yesterday or []) + data["electricity"].today
+    first = min(slots, key=lambda s: s.start)  # 2026-11-15T23:00Z = 00:00 lokaal
+    assert first.market_ex == pytest.approx(0.13552)
+    assert first.total == pytest.approx(0.13552 + 0.02846 + 0.01815 + 0.11085, abs=1e-5)

@@ -82,7 +82,7 @@ def test_custom_epex_source_frank(monkeypatch, load_fixture, now):
     today = now.strftime("%Y-%m-%d")
 
     async def fake_post(session, url, body):
-        m = re.search(r'startDate:"(\d{4}-\d\d-\d\d)"', body["query"])
+        m = re.fullmatch(r"(\d{4}-\d\d-\d\d)", body["variables"]["date"])
         return payload if m and m.group(1) == today else {"data": {}}
 
     monkeypatch.setattr(src, "_post_json", fake_post)

@@ -219,6 +219,16 @@ async def build_custom(session: aiohttp.ClientSession, cfg: dict) -> PriceData:
 # --- Frank Energie (GraphQL): volledige breakdown ---------------------------
 
 _FRANK_FIELDS = "from till marketPrice marketPriceTax sourcingMarkupPrice energyTaxPrice"
+# Sinds eind 2026 weigert Frank de oude marketPricesElectricity/marketPricesGas-query
+# ("Graphql validation error"). Nu: marketPrices per dag, met een verplichte resolutie.
+_FRANK_QUERY = (
+    "query MarketPrices($date: String!, $resolution: PriceResolution!) {"
+    " marketPrices(date: $date, resolution: $resolution) {"
+    f" electricityPrices {{ {_FRANK_FIELDS} }}"
+    f" gasPrices {{ {_FRANK_FIELDS} }}"
+    " } }"
+)
+_FRANK_RESOLUTION = "PT60M"  # uurprijzen, net als de andere bronnen
 
 
 async def _post_json(session: aiohttp.ClientSession, url: str, payload: dict) -> dict:
@@ -232,15 +242,16 @@ async def fetch_frank(session: aiohttp.ClientSession) -> PriceData:
     now = dt_util.now()
     rows_per_energy: dict[str, list[dict]] = {ELECTRICITY: [], GAS: []}
     for offset in (-1, 0, 1):
-        start = (now + timedelta(days=offset)).strftime("%Y-%m-%d")
-        end = (now + timedelta(days=offset + 1)).strftime("%Y-%m-%d")
-        query = (
-            f'query{{marketPricesElectricity(startDate:"{start}",endDate:"{end}"){{{_FRANK_FIELDS}}} '
-            f'marketPricesGas(startDate:"{start}",endDate:"{end}"){{{_FRANK_FIELDS}}}}}'
-        )
-        data = (await _post_json(session, FRANK_URL, {"query": query})).get("data") or {}
-        rows_per_energy[ELECTRICITY].extend(data.get("marketPricesElectricity") or [])
-        rows_per_energy[GAS].extend(data.get("marketPricesGas") or [])
+        day = (now + timedelta(days=offset)).strftime("%Y-%m-%d")
+        payload = {
+            "operationName": "MarketPrices",
+            "query": _FRANK_QUERY,
+            "variables": {"date": day, "resolution": _FRANK_RESOLUTION},
+        }
+        data = (await _post_json(session, FRANK_URL, payload)).get("data") or {}
+        prices = data.get("marketPrices") or {}
+        rows_per_energy[ELECTRICITY].extend(prices.get("electricityPrices") or [])
+        rows_per_energy[GAS].extend(prices.get("gasPrices") or [])
 
     result: PriceData = {}
     for energy, unit in ((ELECTRICITY, "kWh"), (GAS, "m³")):
