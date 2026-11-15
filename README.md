@@ -417,6 +417,19 @@ Je kunt ze dus naast de bestaande voorbeeldkaart zetten. Gepubliceerde uren blij
 kolommen. De voorspelling wordt een **gestippelde stepline met een lichte vulling**, in
 dezelfde kleurdrempels.
 
+**Zonder voorspellingen**: alleen de gepubliceerde prijzen, tot en met morgen (zodra die
+binnen zijn):
+
+![Grafiek zonder voorspellingen: kolommen tot en met morgen](docs/priceoverview.png)
+
+**Met voorspellingen**: na de gepubliceerde kolommen loopt de voorspelling gestippeld door,
+hier tot vier dagen vooruit:
+
+![Grafiek met voorspellingen: kolommen voor gepubliceerde uren, daarna gestippelde voorspelling voor all-in en beurs](docs/priceoverview-forecast.png)
+
+*Massief = gepubliceerd, gestippeld = voorspeld. De header en de legenda tonen de prijs van
+nu.*
+
 De voorspelling is bewust geen tweede kolomserie: ApexCharts zou de kolombreedte dan over
 twee series verdelen, en alle kolommen worden half zo smal.
 

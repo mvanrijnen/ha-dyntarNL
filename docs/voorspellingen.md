@@ -257,6 +257,12 @@ bijvoorbeeld de prijs van morgen 23:00. De voorspelde series staan bewust niet i
 `legend.formatter` uit het README-voorbeeld maakt daar de waarde van nu van. Voorspelde series
 hebben nog geen punt vóór nu en tonen daarom alleen hun naam.
 
+![Grafiek met voorspellingen: kolommen voor gepubliceerde uren, daarna gestippelde voorspelling voor all-in en beurs](priceoverview-forecast.png)
+
+*Zo ziet het eruit: gepubliceerde uren tot en met maandag als kolommen, daarna de voorspelling
+gestippeld tot vrijdag. Zonder voorspellingen stopt de grafiek na de laatste kolom
+([voorbeeld](priceoverview.png)).*
+
 Kort gezegd: **massief = zeker, gestippeld = voorspeld**. Het verschil tussen de oranje/gele
 vlakken en de blauwe lijn is (net als bij de kolommen) je opslag + energiebelasting.
 
@@ -385,6 +391,12 @@ voorspelde uren in twee tabellen:
 
 🟢 is onder € 0,25, 🟡 tot € 0,40 en 🔴 daarboven: dezelfde drempels als de grafiek. Pas
 `uren` bovenaan aan voor een kortere of langere uurtabel.
+
+![Tabel per dag: gemiddelde, minimum, maximum en bron per dag](forecast-table-day.png)
+![Tabel per uur: overgang van gepubliceerde naar voorspelde uren, met marge](forecast-table-hour.png)
+
+*Per dag zie je in één oogopslag welke dagen gepubliceerd en welke voorspeld zijn. In de
+uurtabel gaat "gepubliceerd" na middernacht over in "≈ voorspeld", met de marge erbij.*
 
 ```yaml
 type: markdown
