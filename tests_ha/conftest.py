@@ -7,13 +7,14 @@ op Linux/macOS/WSL (HA draait niet native op Windows).
 import sys
 from pathlib import Path
 
-import custom_components
-
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
-# De plugin brengt een eigen custom_components-pakket (testing_config) mee dat al geladen
-# is; voeg de map uit deze repo toe, zodat HA custom_components.dyntarnl vindt.
+# Afhankelijk van de pluginversie is custom_components al geladen (het testing_config-
+# pakket van de plugin) of nog niet (dan vinden we die van deze repo). Zorg in beide
+# gevallen dat de map uit deze repo erin zit, zodat HA custom_components.dyntarnl vindt.
+import custom_components  # noqa: E402
+
 _ours = str(REPO / "custom_components")
-if _ours not in custom_components.__path__:
+if _ours not in list(custom_components.__path__):
     custom_components.__path__.append(_ours)
