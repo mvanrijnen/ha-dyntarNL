@@ -398,6 +398,18 @@ voorspelde uren in twee tabellen:
 *Per dag zie je in één oogopslag welke dagen gepubliceerd en welke voorspeld zijn. In de
 uurtabel gaat "gepubliceerd" na middernacht over in "≈ voorspeld", met de marge erbij.*
 
+**Zo zet je hem op je scherm:**
+
+1. Open het dashboard waar de tabel moet komen en klik rechtsboven op het **potlood**
+   (*Dashboard bewerken*).
+2. Klik op **+ Kaart toevoegen** en kies **Markdown**.
+3. Klik linksonder op **Code-editor tonen**, maak het veld leeg en plak de YAML hieronder.
+4. Klik op **Opslaan**.
+
+Er is geen extra kaart of HACS-download nodig: Markdown is een standaardkaart van Home
+Assistant. Staan de voorspellingen uit, dan toont de tabel gewoon alleen de gepubliceerde
+prijzen (vandaag en, zodra bekend, morgen).
+
 ```yaml
 type: markdown
 title: Stroomprijzen
