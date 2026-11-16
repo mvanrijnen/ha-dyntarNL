@@ -1,7 +1,7 @@
 # Prijsvoorspellingen in DynTarNL
 
 Vanaf versie 1.1 kan DynTarNL de gepubliceerde day-ahead stroomprijzen aanvullen met
-**voorspellingen tot 7 dagen vooruit**. Deze pagina legt uit hoe dat werkt, wat je kunt
+**voorspellingen tot 7 dagen vooruit** (standaard 72 uur; instelbaar tot 168). Deze pagina legt uit hoe dat werkt, wat je kunt
 instellen, welke entiteiten je krijgt, hoe je de voorspelling in een grafiek zet en hoe je
 die grafiek leest.
 
@@ -106,7 +106,7 @@ Je overige keuzes blijven bewaard voor als je hem later weer aanzet.
 | Ophaalinterval | 6 uur | Hoe vaak elke bron wordt bevraagd (2–24 uur) |
 
 **3. Instellingen per bron.** De EpexPredictor-URL en de optionele API-key voor Energy Price
-Forecast EU. Beide worden met één testcall gecontroleerd. Leeg laten van de key mag; dan geldt
+Forecast EU. Een gewijzigde URL of key wordt met één testcall gecontroleerd. Leeg laten van de key mag; dan geldt
 de gratis horizon van 48 uur.
 
 **4. Geavanceerd.**
@@ -152,13 +152,14 @@ de echte prijs voor dat tijdvak binnenkomt, wordt afgerekend:
   kwartieren);
 - **per bron en per looptijd-bucket**, en voor het ensemble ook **per aantal bronnen**. Zo
   wordt gemeten, en niet aangenomen, of twee bronnen samen beter zijn dan één;
-- **uitschieters gedempt**: de fout per kwartier telt maximaal 0,15 €/kWh mee.
+- **uitschieters gedempt**: de fout per afgerekend uur telt maximaal 0,15 €/kWh mee.
 
 Het meetvenster is voortschrijdend (standaard de laatste 28 dagen). Daardoor vallen
 seizoenseffecten er na een maand vanzelf uit en betekent "MAE" gewoon "gemiddelde fout over
 de afgelopen 28 dagen".
 
-**Verwachte fout.** Elk voorspeld kwartier krijgt een `expected_error`:
+**Verwachte fout.** Elk voorspeld kwartier krijgt een verwachte fout (`expected_error_raw` en
+`expected_error_allin`):
 
 ```text
 verwachte fout (kaal) = √( MAE² + (spreiding / 2)² )
@@ -199,13 +200,13 @@ groeit er niet van.
 
 | Entiteit | Betekenis |
 | --- | --- |
-| `sensor.dyntarnl_forecast_<bron>_mae` | Gemiddelde absolute fout (kaal, €/kWh) over het meetvenster, looptijd 0–1 dag. Attribuut `buckets` heeft alle looptijden |
+| `sensor.dyntarnl_forecast_<bron>_mae` | (Alleen met *Nauwkeurigheid meten* aan, net als `_bias` en `_settled`.) Gemiddelde absolute fout (kaal, €/kWh) over het meetvenster, looptijd 0–1 dag. Attribuut `buckets` heeft alle looptijden |
 | `sensor.dyntarnl_forecast_<bron>_bias` | Gemiddelde afwijking: positief = voorspelt te hoog |
 | `sensor.dyntarnl_forecast_<bron>_settled` | Aantal afgerekende kwartieren in het venster (`settled_total` = sinds het begin) |
-| `sensor.dyntarnl_forecast_<bron>_weight` | Huidig gewicht in het ensemble (%), per looptijd in `buckets` |
+| `sensor.dyntarnl_forecast_<bron>_weight` | (Alleen met het ensemble aan.) Huidig gewicht in het ensemble (%), per looptijd in `buckets` |
 | `sensor.dyntarnl_forecast_<bron>_last_fetch` | Laatste geslaagde ophaalactie. Attributen: `status` (`ok`/`backoff`/`pending`), `last_error`, `next_attempt`, `points`, `forecast_until`. Bij Energy Price Forecast EU ook wat de bron zelf meldt: `plan` (bijv. `free` of Pro), `allowed_horizon_hours`, `api_key_state` (zo zie je of je key werkt) en `expansion_method` (hoe uurvoorspellingen naar kwartieren gaan) |
 
-`<bron>` is `epexpredictor` of `energypriceforecast`. Voor het ensemble zijn er
+`<bron>` is `epexpredictor` of `energypriceforecast`. Met ensemble én nauwkeurigheidsmeting aan zijn er
 `sensor.dyntarnl_forecast_ensemble_mae` (met de fout per looptijd én per aantal bronnen) en
 `sensor.dyntarnl_forecast_ensemble_settled`.
 
@@ -221,7 +222,7 @@ data:
   energy: electricity        # of gas (alleen gepubliceerd, per gasdag)
   include_forecast: true
   provider: ensemble         # of epexpredictor / energypriceforecast / all
-  horizon: 72                # uren vanaf nu (optioneel)
+  horizon: 72                # tot zoveel uur vanaf nu (optioneel; de reeks begint bij gisteren 00:00)
 response_variable: prijzen
 ```
 
@@ -275,7 +276,7 @@ hebben nog geen punt vóór nu en tonen daarom alleen hun naam.
 gestippeld tot vrijdag. Zonder voorspellingen stopt de grafiek na de laatste kolom
 ([voorbeeld](priceoverview.png)).*
 
-Kort gezegd: **massief = zeker, gestippeld = voorspeld**. Het verschil tussen de oranje/gele
+Kort gezegd: **massief = zeker, gestippeld = voorspeld**. Het verschil tussen de gekleurde
 vlakken en de blauwe lijn is (net als bij de kolommen) je opslag + energiebelasting.
 
 Rond 13:00 verschijnen de prijzen van morgen. Het gestippelde stuk voor morgen wordt dan

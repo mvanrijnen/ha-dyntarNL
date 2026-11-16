@@ -47,7 +47,6 @@
       }
     },
     "abort": {
-      "already_configured": "Deze leverancier is al ingesteld.",
       "reconfigure_successful": "De instellingen zijn bijgewerkt."
     }
   },
@@ -138,7 +137,7 @@
       },
       "provider_settings": {
         "title": "Instellingen per bron",
-        "description": "Instellingen van de gekozen bronnen. Ze worden met één testcall gecontroleerd.\n\nEnergy Price Forecast EU: zonder key 48 uur, met een [Private Pro]({private_pro_url})-key 120 uur. Alleen voor privé, niet-commercieel gebruik.",
+        "description": "Instellingen van de gekozen bronnen. Een gewijzigde URL of key wordt met één testcall gecontroleerd.\n\nEnergy Price Forecast EU: zonder key 48 uur, met een [Private Pro]({private_pro_url})-key 120 uur. Alleen voor privé, niet-commercieel gebruik.",
         "data": {
           "forecast_epexpredictor_url": "EpexPredictor-URL",
           "forecast_energypriceforecast_api_key": "Energy Price Forecast EU API-key (optioneel)"

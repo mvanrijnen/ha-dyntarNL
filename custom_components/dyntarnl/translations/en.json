@@ -47,7 +47,6 @@
       }
     },
     "abort": {
-      "already_configured": "This supplier is already configured.",
       "reconfigure_successful": "The settings have been updated."
     }
   },
@@ -138,7 +137,7 @@
       },
       "provider_settings": {
         "title": "Source settings",
-        "description": "Settings per selected source. They are checked with one test call.\n\nEnergy Price Forecast EU: 48 hours without a key, 120 hours with a [Private Pro]({private_pro_url}) key. Private, non-commercial use only.",
+        "description": "Settings per selected source. A changed URL or key is checked with one test call.\n\nEnergy Price Forecast EU: 48 hours without a key, 120 hours with a [Private Pro]({private_pro_url}) key. Private, non-commercial use only.",
         "data": {
           "forecast_epexpredictor_url": "EpexPredictor URL",
           "forecast_energypriceforecast_api_key": "Energy Price Forecast EU API key (optional)"

@@ -14,7 +14,7 @@ Everything the user sees (README, `strings.json`) plus most code comments/docstr
 ## Commands
 
 ```bash
-pytest                 # full suite (~115 tests, no HA install, no network)
+pytest                 # full suite (~160 tests, no HA install, no network)
 pytest tests/test_sources.py::test_frank_parser -q            # single test
 pytest -k gasday
 ```
@@ -27,6 +27,10 @@ The HACS action runs with no `ignore:` — it passes on the in-integration `bran
 options flow, setup, sensors, services) via pytest-homeassistant-custom-component:
 `pytest -c tests_ha/pytest.ini tests_ha`. HA does not run on native Windows (no `fcntl`);
 use WSL or CI (job `real-ha`).
+
+`tools/live_check.py` queries every source that needs no login (suppliers, Custom EPEX sources,
+forecasters) and checks the data; run it after every change (needs HA installed, e.g. the WSL
+venv): `python tools/live_check.py`.
 
 There is no linter/formatter configured. Tests are the only gate.
 

@@ -16,7 +16,7 @@ leveranciers** als sensoren publiceert. Je kiest je leverancier; de integratie b
 welk platform en welke publieke prijs-API erbij hoort. **Geen account of API-sleutel nodig**
 voor de ondersteunde leveranciers.
 
-**Optioneel:** [prijsvoorspellingen tot 7 dagen vooruit](#prijsvoorspellingen-optioneel). DynTarNL
+**Optioneel:** [prijsvoorspellingen tot 7 dagen vooruit](#prijsvoorspellingen-optioneel) (standaard 72 uur). DynTarNL
 voorspelt daarbij **zelf niets**: het leest de voorspellingen van externe voorspellers uit,
 middelt ze gewogen en corrigeert ze (met de tarieven van jouw leverancier en hun gemeten
 nauwkeurigheid). Handig om laden, de thuisaccu of de wasmachine verder vooruit te plannen dan
@@ -42,8 +42,8 @@ leveranciers gebruik je via **CUSTOM**.
 | --- | --- | --- |
 | Essent, Energiedirect | eon-app | volledig (beurs + opslag + belasting) |
 | Frank Energie | frank | volledig |
-| EasyEnergie | easyenergy | volledig |
-| **Eigen leverancier (handmatig)** | custom | jij vult opslag + belasting + btw in |
+| easyEnergy | easyenergy | volledig |
+| **Custom supplier (manual)** | custom | jij vult opslag + belasting + btw in |
 
 **Waarom niet elke leverancier in de lijst?** Sommige bronnen geven **alleen een
 marktprijs** door, geen opslag/all-in — dan zouden we een verkeerde all-in tonen. Voor die
@@ -55,14 +55,15 @@ leveranciers is **CUSTOM** de juiste route:
 - **Login-only** leveranciers (**Vattenfall, Eneco, Tibber, Greenchoice, Zonneplan, ENGIE,
   DELTA, Vandebron, OXXIO** e.a.): geen publieke prijs-API.
 
-Bij **CUSTOM** vul je éénmalig je opslag + energiebelasting (excl. btw) + btw in; de EPEX-
+Bij **CUSTOM** vul je eenmalig je opslag + energiebelasting (excl. btw) + btw in; de EPEX-
 beursprijs (voor iedereen gelijk) wordt automatisch opgehaald en je all-in exact berekend.
 
 ## Entiteiten (referentie)
 
 Je kiest **één** leverancier; de `entity_id`'s bevatten daarom **geen** leverancier-naam.
 De namen zijn **compact & Engels** (alleen `a-z0-9_`). Je krijgt drie devices:
-**DynTarNL E** (stroom), **DynTarNL G** (gas) en **DynTarNL** (voor de knop). De gekozen
+**DynTarNL E** (stroom), **DynTarNL G** (gas) en **DynTarNL** (voor de knop); met de
+voorspellingen aan komt er een vierde bij, **DynTarNL Forecast** (diagnostiek). De gekozen
 leverancier staat als *fabrikant* op de device-pagina. Bedragen incl. btw, in €/kWh (stroom)
 of €/m³ (gas).
 
@@ -104,7 +105,7 @@ Bijv. `sensor.dyntarnl_e_all_in_now`, `sensor.dyntarnl_g_market_today_avg`.
 | entity_id | Aan wanneer |
 | --- | --- |
 | `binary_sensor.dyntarnl_e_neg_price_now` / `_neg_price_prev` / `_neg_price_next` | beursprijs < 0 |
-| `binary_sensor.dyntarnl_e_export_loss_now` / `_export_loss_next` | export levert niets op (beurs ≤ opslag) |
+| `binary_sensor.dyntarnl_e_export_loss_now` / `_export_loss_next` | export levert niets op (beurs < opslag) |
 | `binary_sensor.dyntarnl_e_tomorrow_available` / `..._g_...` | prijzen van morgen gepubliceerd |
 
 ### Knop / actions
@@ -264,15 +265,18 @@ zijn blijft het laatste etmaal leeg.
 
 ### Voorbeeld-automatisering: ZeroExport bij ongunstige teruglevering
 
+Plak dit in de automatisering-editor (⋮ → *Bewerken in YAML*):
+
 ```yaml
-automation:
-  - alias: ZeroExport aan/uit op teruglevering
-    trigger:
-      - platform: state
-        entity_id: binary_sensor.dyntarnl_e_export_loss_now
-    action:
-      - service: "switch.turn_{{ 'on' if trigger.to_state.state == 'on' else 'off' }}"
-        target: { entity_id: switch.omvormer_zero_export }
+alias: ZeroExport aan/uit op teruglevering
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.dyntarnl_e_export_loss_now
+    to: ["on", "off"]
+actions:
+  - action: "switch.turn_{{ trigger.to_state.state }}"
+    target:
+      entity_id: switch.omvormer_zero_export
 ```
 
 ## Automatische detectie van platform, opslag & tarieven
@@ -285,7 +289,7 @@ Je kiest alleen je **merk**; de integratie regelt de rest zelf:
 
 2. **Volledige uitsplitsing, automatisch.** Alle leveranciers in de lijst leveren de complete
    breakdown (beursprijs + opslag + energiebelasting) via hun API. De component-sensoren en de
-   teruglever-drempel `beursprijs ≤ opslag` worden dus **automatisch met de echte
+   teruglever-drempel `beursprijs < opslag` worden dus **automatisch met de echte
    leverancier-opslag** gevuld — je hoeft niets in te vullen.
 
 3. **Alleen bij CUSTOM vul je zelf gegevens in.** Leveranciers die geen bruikbare opslag/all-in
@@ -296,7 +300,7 @@ Je kiest alleen je **merk**; de integratie regelt de rest zelf:
    kale EPEX **niet** apart opgehaald. Alleen als een bron ooit wél een all-in maar géén
    beurs zou geven, haalt de integratie EPEX op als vangnet om de beurs af te leiden.
 
-5. **CUSTOM: zelf de tarieven.** Kies je "Eigen leverancier", dan reken je je all-in prijs op
+5. **CUSTOM: zelf de tarieven.** Kies je "Custom supplier (manual)", dan reken je je all-in prijs op
    basis van de EPEX + je eigen (excl. btw) opslag en energiebelasting; de btw wordt er
    automatisch overheen gerekend:
 
@@ -327,7 +331,7 @@ De prijs-*array* verandert maar een paar keer per dag, dus de integratie is zuin
 ## Prijsvoorspellingen (optioneel)
 
 Vanaf 1.1 kan DynTarNL de gepubliceerde day-ahead prijzen aanvullen met **voorspellingen tot
-7 dagen vooruit**. De optie staat **standaard uit**. Zolang hij uit staat verandert er niets:
+7 dagen vooruit** (standaard 72 uur; instelbaar tot 168). De optie staat **standaard uit**. Zolang hij uit staat verandert er niets:
 geen extra API-calls, geen extra entiteiten en geen andere sensoren of attributen.
 
 > **DynTarNL is zelf geen voorspeller.** Het heeft geen eigen prijsmodel. Het doet drie dingen
@@ -420,8 +424,8 @@ op het ophalen of tonen van de gepubliceerde prijzen.**
 | `sensor.dyntarnl_e_cheapest_block_start` | Start van het goedkoopste aaneengesloten blok van N uur (standaard 3) in de komende 48 uur, inclusief voorspellingen. Attributen: `end`, `avg_price_allin`, `source` (`published`/`forecast`/`mixed`), `expected_error_allin` |
 | `sensor.dyntarnl_e_all_in_forecast_avg` | Gemiddelde all-in prijs over de komende 24 uur. Draagt de volledige reeks `prices` (`[epoch-ms, all-in, "p"\|"f"]`) en `error_band` voor grafieken. Die attributen worden **niet** in de recorder opgeslagen |
 | `sensor.dyntarnl_e_tomorrow_avg_forecast` | Gemiddelde all-in van morgen: gepubliceerd als dat er is, anders voorspeld (met `source`) |
-| `sensor.dyntarnl_forecast_<bron>_mae` / `_bias` / `_settled` / `_weight` / `_last_fetch` | Diagnostiek per bron: gemeten fout, systematische fout, aantal afgerekende kwartieren, huidig gewicht en ophaalstatus |
-| `sensor.dyntarnl_forecast_ensemble_mae` / `_settled` | Gemeten fout van het ensemble, per bucket en per aantal bronnen |
+| `sensor.dyntarnl_forecast_<bron>_mae` / `_bias` / `_settled` / `_weight` / `_last_fetch` | Diagnostiek per bron: gemeten fout, systematische fout, aantal afgerekende kwartieren, huidig gewicht en ophaalstatus. `_mae`/`_bias`/`_settled` alleen met *Nauwkeurigheid meten* aan, `_weight` alleen met het ensemble aan |
+| `sensor.dyntarnl_forecast_ensemble_mae` / `_settled` | Gemeten fout van het ensemble, per bucket en per aantal bronnen (alleen met ensemble én nauwkeurigheidsmeting aan) |
 
 Zet je de optie uit (of een bron), dan worden de bijbehorende entiteiten automatisch opgeruimd.
 
@@ -617,7 +621,7 @@ data:
   energy: electricity        # of gas (alleen gepubliceerd, per gasdag)
   include_forecast: true
   provider: ensemble         # of epexpredictor / energypriceforecast / all
-  horizon: 72                # uren vanaf nu (optioneel)
+  horizon: 72                # tot zoveel uur vanaf nu (optioneel; de reeks begint bij gisteren 00:00)
 response_variable: prijzen
 ```
 

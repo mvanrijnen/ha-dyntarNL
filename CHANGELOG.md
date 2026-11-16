@@ -21,6 +21,7 @@ oudere versies staan op de [releases-pagina](https://github.com/mvanrijnen/ha-dy
 - **Nieuw: leverancier of eigen tarieven wijzigen** via *Opnieuw configureren*, zonder de
   integratie te verwijderen. Entiteiten en hun historie blijven behouden.
 - **Nieuw: service `dyntarnl.get_prices`** voor de volledige prijsreeks per kwartier.
+- **Ververs-knop** (en `dyntarnl.refresh`) haalt nu ook de voorspellingen direct opnieuw op.
 - **Nieuw: Nederlandse vertaling** van de configuratieschermen.
 - **Opgelost:** een eigen leverancier (*Custom supplier*) toevoegen gaf "Unknown error occurred"
   ([#3](https://github.com/mvanrijnen/ha-dyntarNL/issues/3)), en Frank Energie gaf geen prijzen

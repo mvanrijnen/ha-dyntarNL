@@ -12,9 +12,9 @@ LOGGER = logging.getLogger(__package__)
 
 # --- Platforms (databron-technieken) ---------------------------------------
 PLATFORM_EON_APP = "eon_app"      # E.ON eon-app: volledige breakdown
-PLATFORM_ENERGYZERO = "energyzero"  # EnergyZero: alleen all-in prijs
+PLATFORM_ENERGYZERO = "energyzero"  # EnergyZero: alleen marktprijs (EPEX-bron voor CUSTOM)
 PLATFORM_FRANK = "frank"          # Frank Energie GraphQL: volledige breakdown
-PLATFORM_EASYENERGY = "easyenergy"  # easyEnergy: EPEX + belasting
+PLATFORM_EASYENERGY = "easyenergy"  # easyEnergy: volledige breakdown
 PLATFORM_CUSTOM = "custom"        # eigen leverancier: EPEX + zelf ingevulde opslag/btw
 
 
@@ -85,8 +85,8 @@ EASYENERGY_URL = "https://price-graph.mijn.easyenergy.com/api/prices"
 ENERGYZERO_URL = "https://api.energyzero.nl/v1/energyprices"
 FRANK_URL = "https://graphql.frankenergie.nl"
 
-# EPEX wordt ALTIJD opgehaald (via easyEnergy) als basis/fallback voor de
-# beurs-waarde en de teruglever-drempels, ongeacht de gekozen leverancier.
+# EPEX (via easyEnergy) wordt alleen als vangnet opgehaald, voor een bron die geen eigen
+# beursprijs levert (zie coordinator._needs_epex_fallback); de huidige bronnen doen dat wel.
 ELECTRICITY = "electricity"
 GAS = "gas"
 
