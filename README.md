@@ -9,6 +9,8 @@
 [![hacs](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/integration)
 [![release](https://img.shields.io/github/v/release/mvanrijnen/ha-dyntarNL)](https://github.com/mvanrijnen/ha-dyntarNL/releases)
 
+➡️ **[Direct naar de installatie](#installatie)**
+
 Home Assistant integratie die de **dynamische energietarieven van meerdere Nederlandse
 leveranciers** als sensoren publiceert. Je kiest je leverancier; de integratie bepaalt zelf
 welk platform en welke publieke prijs-API erbij hoort. **Geen account of API-sleutel nodig**
@@ -639,6 +641,8 @@ Elk record heeft de velden:
   dan gaat alleen die bron in storing. De maker heeft het gebruik vanuit DynTarNL goedgekeurd
   voor privé, niet-commercieel gebruik met directe API-toegang
   ([issue #4](https://github.com/mvanrijnen/ha-dyntarNL/issues/4)).
+
+<a id="installatie"></a>
 
 ## Installatie (HACS)
 
