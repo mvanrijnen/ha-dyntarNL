@@ -91,6 +91,7 @@ class DynTarNLForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
         self._tick_lock = asyncio.Lock()
         self._force_pending = False  # Ververs tijdens een lopende ronde: daarna alsnog
         self._closed = False  # na unload: niets meer ophalen of opslaan
+        self._loaded = False  # opslag ingelezen; daarvoor nooit (leeg) wegschrijven
         # Opgeslagen statistiek bewaren als de meting (tijdelijk) uit staat, zodat
         # 'nauwkeurigheid uit' de opgebouwde historie niet weggooit.
         self._stored_accuracy: dict | None = None
@@ -198,7 +199,7 @@ class DynTarNLForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
                 )
             # Alleen opslaan als er iets veranderde (nieuwe reeks, snapshot of afrekening);
             # anders schreef elk uur-update ~0,5 MB weg (SD-kaart).
-            if snapshot or settled:
+            if self._loaded and (snapshot or settled):
                 self._store.async_delay_save(self._data_to_save, _SAVE_DELAY)
         except Exception:  # noqa: BLE001 - nooit de listener-keten van de prijzen breken
             LOGGER.exception("Voorspellingen samenvoegen mislukt")
@@ -260,6 +261,7 @@ class DynTarNLForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
             # fetch (tot 6 uur later), terwijl de reeks gewoon vers is.
             self.status[key].last_success = fetched_at
         self._stored_accuracy = stored.get("accuracy")
+        self._loaded = True
         if self.tracker is not None:
             try:
                 self.tracker.load(self._stored_accuracy)
@@ -272,6 +274,11 @@ class DynTarNLForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
         na het verwijderen het opslagbestand terug, of overschrijft hij na een reload de
         nieuwere data."""
         self._closed = True
+        if not self._loaded:
+            # Unload terwijl de opslag nog werd ingelezen (bijv. twee keer snel herladen):
+            # niet wegschrijven, anders overschrijft een lege stand de bewaarde reeksen en
+            # de hele nauwkeurigheidshistorie. Wat op schijf staat is dan het nieuwste.
+            return
         await self._store.async_save(self._data_to_save())
 
     async def async_start(self) -> None:

@@ -24,7 +24,7 @@ from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
-from ..const import DOMAIN, ELECTRICITY, ENSEMBLE, FC_CHEAPEST_LOOKAHEAD_H, LEAD_BUCKETS, NAME
+from ..const import DOMAIN, ELECTRICITY, ENSEMBLE, FC_CHEAPEST_LOOKAHEAD_H, LEAD_BUCKETS, LOGGER, NAME
 from .coordinator import DynTarNLForecastCoordinator
 from .model import ForecastConfig
 from .views import chart_series, chart_step, cheapest_block, forecast_chart, next_24h, tomorrow
@@ -288,11 +288,20 @@ class DynTarNLForecastSensor(CoordinatorEntity[DynTarNLForecastCoordinator], Sen
                 entry_type=DeviceEntryType.SERVICE,
             )
 
+    _logged_error = False
+
+    def _failed(self) -> None:
+        # Niet crashen, maar ook niet stil: één keer (debug) loggen waarom de waarde ontbreekt.
+        if not self._logged_error:
+            self._logged_error = True
+            LOGGER.debug("Voorspel-sensor %s kon niet berekend worden", self.entity_description.key, exc_info=True)
+
     @property
     def native_value(self) -> Any:
         try:
             return self.entity_description.value_fn(self.coordinator)
-        except Exception:  # noqa: BLE001 - een diagnose-sensor mag nooit crashen
+        except Exception:  # noqa: BLE001 - een sensor mag nooit crashen
+            self._failed()
             return None
 
     @property
@@ -302,6 +311,7 @@ class DynTarNLForecastSensor(CoordinatorEntity[DynTarNLForecastCoordinator], Sen
         try:
             return self.entity_description.attr_fn(self.coordinator)
         except Exception:  # noqa: BLE001
+            self._failed()
             return None
 
 

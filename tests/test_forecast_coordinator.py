@@ -32,6 +32,7 @@ def _make(entry_id="e1", **options):
     entry = Entry(entry_id=entry_id)
     prices = FakePrices(prices_data())
     fc = DynTarNLForecastCoordinator(None, entry, prices, cfg(**options))
+    asyncio.run(fc.async_load())  # zoals async_start: eerst de opslag inlezen
     return fc, prices
 
 
@@ -353,3 +354,17 @@ def test_ensemble_snapshot_uses_oldest_contributing_fetch(at_time):
     asyncio.run(fc.async_tick())
     ens = [s for s in fc.tracker.snapshots if s["p"] == "ensemble"][-1]
     assert datetime.fromisoformat(ens["f"]) == NOW  # A's fetch van 6 uur eerder
+
+
+def test_unload_during_load_does_not_wipe_storage():
+    """Herladen terwijl de opslag nog werd ingelezen mocht geen lege stand wegschrijven."""
+    import sys
+
+    from dyntarnl.forecast.coordinator import DynTarNLForecastCoordinator as FC
+
+    store = sys.modules["homeassistant.helpers.storage"].Store
+    saved = {"series": {A: {"f": NOW.isoformat(), "s": TOMORROW.isoformat(), "v": [0.1], "e": [0]}}, "accuracy": {"total": {"x": [4, 0.1, 0.1]}}}
+    store.data["dyntarnl.forecast_race"] = saved
+    fc = FC(None, Entry(entry_id="race"), FakePrices(prices_data()), cfg())  # nog niet ingelezen
+    asyncio.run(fc.async_flush())
+    assert store.data["dyntarnl.forecast_race"] == saved
