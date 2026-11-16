@@ -275,6 +275,10 @@ class DynTarNLForecastSensor(CoordinatorEntity[DynTarNLForecastCoordinator], Sen
         self.entity_description = description
         entry_id = coordinator.config_entry.entry_id
         self._attr_unique_id = f"{entry_id}_{unique_suffix(description)}"
+        # Bronvermelding van de voorspellers waar deze sensor op rust.
+        self._attr_attribution = "; ".join(
+            p.attribution for p in coordinator.providers.values() if p.attribution
+        ) or None
         manufacturer = coordinator.supplier_name or NAME
         if description.on_energy_device:
             # Zelfde device als de bestaande stroomsensoren (zie entity.py).

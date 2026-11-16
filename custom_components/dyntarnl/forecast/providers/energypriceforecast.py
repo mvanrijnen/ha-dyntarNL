@@ -34,6 +34,7 @@ _UNIT_FACTOR = {"EUR/kWh": 1.0, "EUR/MWh": 0.001}
 class EnergyPriceForecastProvider(ForecastProvider):
     key = PROVIDER_EPF
     name = "Energy Price Forecast EU"
+    attribution = "Energy Price Forecast EU (energypriceforecast.eu)"
     option_keys = (CONF_FC_EPF_API_KEY,)
     max_horizon_hours = 120
 

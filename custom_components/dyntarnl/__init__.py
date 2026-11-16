@@ -248,7 +248,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -> 
     # 2) Doorproberen tot de prijzen van morgen binnen zijn (ook 's avonds). Elk half
     #    uur, op een minuut die per installatie verschilt — anders vragen alle
     #    installaties tegelijk aan bij de leverancier.
-    offset = _spread(entry.entry_id, 30)
+    # 1–29 (niet 0): op :00 loopt al het uur-tik, samen gaf dat een dubbele fetch.
+    offset = _spread(entry.entry_id, 29) + 1
     entry.async_on_unload(
         async_track_time_change(
             hass,

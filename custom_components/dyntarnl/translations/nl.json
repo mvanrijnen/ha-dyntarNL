@@ -47,7 +47,8 @@
       }
     },
     "abort": {
-      "reconfigure_successful": "De instellingen zijn bijgewerkt."
+      "reconfigure_successful": "De instellingen zijn bijgewerkt.",
+      "single_instance_allowed": "DynTarNL is al ingesteld. Wijzig de leverancier via ⋮ → Opnieuw configureren."
     }
   },
   "selector": {

@@ -368,3 +368,21 @@ def test_unload_during_load_does_not_wipe_storage():
     fc = FC(None, Entry(entry_id="race"), FakePrices(prices_data()), cfg())  # nog niet ingelezen
     asyncio.run(fc.async_flush())
     assert store.data["dyntarnl.forecast_race"] == saved
+
+
+def test_error_text_hides_credentials_in_url():
+    from dyntarnl.forecast.coordinator import safe_error
+
+    err = RuntimeError("404, message='Not Found', url=URL('https://user:geheim@my.host/prices')")
+    text = safe_error(err)
+    assert "geheim" not in text and "user" not in text and "my.host/prices" in text
+
+
+def test_forecast_sensors_carry_attribution():
+    from dyntarnl.forecast.sensor import forecast_entities
+
+    fc, _ = _make()
+    attributions = {e._attr_attribution for e in forecast_entities(fc)}
+    assert len(attributions) == 1
+    text = attributions.pop()
+    assert "CC-BY-4.0" in text and "Open-Meteo" in text and "Energy Price Forecast EU" in text

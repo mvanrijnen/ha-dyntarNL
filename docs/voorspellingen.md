@@ -56,6 +56,10 @@ ontwerp maakt het makkelijk om er later meer toe te voegen.
 | [EpexPredictor](https://github.com/b3nn0/EpexPredictor) | ± 7 dagen, per kwartier | URL instelbaar: de publieke instantie of je eigen (container of add-on) |
 | [Energy Price Forecast EU](https://energypriceforecast.eu) | 48 uur zonder key, 120 uur met een [Private Pro](https://energypriceforecast.eu/en/private-pro/)-key | Optionele API-key |
 
+**Bronvermelding.** EpexPredictor gebruikt prijzen van energy-charts.info / ENTSO-E (CC-BY-4.0)
+en weerdata van Open-Meteo.com; Energy Price Forecast EU is van energypriceforecast.eu. De
+voorspel-sensoren tonen dit in hun *attribution*.
+
 **Altijd de kale prijs, jouw formule.** Van elke bron haalt DynTarNL alleen de kale
 EPEX-prijs op. De opslag- en btw-opties van die diensten gebruiken we bewust niet. Op de kale
 prijs past DynTarNL de formule van jouw leverancier toe, met **exact dezelfde functie** als

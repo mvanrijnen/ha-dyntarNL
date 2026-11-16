@@ -47,7 +47,8 @@
       }
     },
     "abort": {
-      "reconfigure_successful": "The settings have been updated."
+      "reconfigure_successful": "The settings have been updated.",
+      "single_instance_allowed": "DynTarNL is already set up. Change the supplier via ⋮ → Reconfigure."
     }
   },
   "selector": {

@@ -23,6 +23,10 @@ from .base import ForecastProvider, ProviderError, parse_utc, to_quarters
 class EpexPredictorProvider(ForecastProvider):
     key = PROVIDER_EPEXPREDICTOR
     name = "EpexPredictor"
+    # CC-BY-4.0: naamsvermelding verplicht waar de data getoond wordt.
+    attribution = (
+        "EpexPredictor; prijzen: energy-charts.info / ENTSO-E (CC-BY-4.0); weer: Open-Meteo.com"
+    )
     option_keys = (CONF_FC_EPEXPREDICTOR_URL,)
     max_horizon_hours = 168
 

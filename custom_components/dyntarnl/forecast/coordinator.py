@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -38,6 +39,15 @@ from .providers import PROVIDERS, ForecastProvider
 # Een fetch die net iets te vroeg valt (tick om de 15 min) telt toch als op tijd.
 _DUE_TOLERANCE = timedelta(minutes=5)
 _SAVE_DELAY = 60
+
+
+_USERINFO = re.compile(r"(//)[^/@\s]+@")
+
+
+def safe_error(err: BaseException) -> str:
+    """Foutmelding zonder inloggegevens: een eigen URL als https://user:pass@host mag niet
+    in het log of het (gerecorde) last_error-attribuut belanden."""
+    return _USERINFO.sub(r"\1", f"{type(err).__name__}: {err}")[:300]
 
 
 def storage_key(entry_id: str) -> str:
@@ -139,13 +149,17 @@ class DynTarNLForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
             raise
         except Exception as err:  # noqa: BLE001 - een provider mag nooit iets breken
             status.failures += 1
-            status.last_error = f"{type(err).__name__}: {err}"
+            status.last_error = safe_error(err)
             status.next_attempt = now + backoff(status.failures)
-            LOGGER.warning(
+            # Eén waarschuwing bij uitval; daarna alleen debug (anders ~7 per dag per bron).
+            log = LOGGER.warning if status.failures == 1 else LOGGER.debug
+            log(
                 "Voorspelling van %s mislukt (%s); volgende poging na %s",
                 key, status.last_error, status.next_attempt.isoformat(),
             )
             return False
+        if status.failures:
+            LOGGER.info("Voorspelling van %s weer beschikbaar", key)
         status.failures = 0
         status.last_error = None
         status.next_attempt = None

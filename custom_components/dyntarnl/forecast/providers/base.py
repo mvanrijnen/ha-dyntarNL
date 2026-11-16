@@ -82,6 +82,8 @@ class ForecastProvider(ABC):
     option_keys: tuple[str, ...] = ()
     #: Maximale horizon die de bron kan leveren (uren).
     max_horizon_hours: int = 168
+    #: Bronvermelding die bij de data hoort (licentie), getoond op de voorspel-sensoren.
+    attribution: str = ""
 
     def __init__(self, options: Mapping) -> None:
         self.options = options

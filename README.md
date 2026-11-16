@@ -362,6 +362,8 @@ moment, zonder de integratie opnieuw toe te voegen.
     maximaal 48 uur. Met een key van [Private Pro](https://energypriceforecast.eu/en/private-pro/) tot 120 uur. Gebruik is toegestaan
     voor privé, niet-commercieel gebruik, waarbij je installatie de API zelf rechtstreeks
     bevraagt (zo werkt DynTarNL).
+- **Bronvermelding:** EpexPredictor gebruikt prijzen van energy-charts.info / ENTSO-E
+  (CC-BY-4.0) en weerdata van Open-Meteo.com. De voorspel-sensoren tonen dat als *attribution*.
 - **Altijd de kale EPEX-prijs.** De opslag- en btw-opties van de bronnen worden niet gebruikt.
   DynTarNL past er de formule van jouw leverancier op toe, met **exact dezelfde functie** als
   voor CUSTOM:

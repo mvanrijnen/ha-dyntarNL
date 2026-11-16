@@ -25,3 +25,11 @@ def test_spread_actually_spreads():
 def test_retry_window_covers_afternoon_and_evening():
     assert _TOMORROW_RETRY_HOURS[0] == 13
     assert _TOMORROW_RETRY_HOURS[-1] == 23
+
+
+def test_tomorrow_retry_minute_never_collides_with_hourly_tick():
+    """Offset 0 viel samen met het uur-tik (:00) en gaf een dubbele fetch."""
+    import dyntarnl
+
+    offsets = {dyntarnl._spread(f"entry{i}", 29) + 1 for i in range(2000)}
+    assert min(offsets) >= 1 and max(offsets) <= 29
