@@ -327,3 +327,29 @@ def test_nothing_is_saved_after_unload():
     fc.rebuild()
     asyncio.run(fc.async_tick(force=True))
     assert "dyntarnl.forecast_closed" not in store.data
+
+
+def test_hourly_rebuild_without_changes_does_not_rewrite_storage():
+    import sys
+
+    store = sys.modules["homeassistant.helpers.storage"].Store
+    fc, _ = _make(entry_id="quiet")
+    _stub(fc, A, _points(0.1), [])
+    _stub(fc, B, _points(0.2), [])
+    asyncio.run(fc.async_tick())
+    store.data.pop("dyntarnl.forecast_quiet", None)
+    fc.handle_prices_update()  # geen nieuwe reeks, niets af te rekenen
+    assert "dyntarnl.forecast_quiet" not in store.data
+
+
+def test_ensemble_snapshot_uses_oldest_contributing_fetch(at_time):
+    fc, _ = _make()
+    _stub(fc, A, _points(0.1), [])
+    _stub(fc, B, _points(0.2), [])
+    asyncio.run(fc.async_tick())
+    at_time(NOW + timedelta(hours=6))
+    _stub(fc, B, _points(0.2), [])
+    _stub(fc, A, RuntimeError("down"), [])  # A blijft op zijn oude reeks
+    asyncio.run(fc.async_tick())
+    ens = [s for s in fc.tracker.snapshots if s["p"] == "ensemble"][-1]
+    assert datetime.fromisoformat(ens["f"]) == NOW  # A's fetch van 6 uur eerder

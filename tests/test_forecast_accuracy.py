@@ -106,3 +106,15 @@ def test_roundtrip_through_storage():
     a, b = restored.provider_stat(A, "d0_1"), tracker.provider_stat(A, "d0_1")
     assert a.count == b.count and a.mae == pytest.approx(b.mae) and a.bias == pytest.approx(b.bias)
     assert len(restored.snapshots) == 1  # tweede uur nog open
+
+
+def test_settled_prefix_is_trimmed_from_snapshots():
+    """Afgerekende kwartieren uit de snapshot halen houdt de opslag klein."""
+    tracker = AccuracyTracker()
+    target = DAY_START + timedelta(days=1)
+    tracker.add_snapshot(A, target - timedelta(hours=5), _points(target, [0.1] * 8))
+    tracker.settle(hour_slots(target, [0.1]), NOW)
+    snap = tracker.snapshots[0]
+    assert len(snap["v"]) == 4 and snap["s"] == (target + timedelta(hours=1)).isoformat()
+    tracker.settle(hour_slots(target, [0.1, 0.2]), NOW)  # tweede uur nog steeds goed afgerekend
+    assert tracker.provider_stat(A, "d0_1").count == 8

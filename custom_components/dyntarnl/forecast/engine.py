@@ -187,8 +187,14 @@ def build(
     if cfg.ensemble:
         combined = combine(live, stat_fn, cfg)
         ensemble_records = []
+        # Per (bucket, n, bronnen) maar één keer opzoeken: dit liep per kwartier door de hele
+        # 28-daagse statistiek (~80% van de rekentijd bij 168 uur horizon).
+        mae_cache: dict[tuple, float | None] = {}
         for c in combined.values():
-            mae = ensemble_mae(tracker, lead_bucket(c.start, now), c.n_sources, c.providers, cfg)
+            key = (lead_bucket(c.start, now), c.n_sources, c.providers)
+            if key not in mae_cache:
+                mae_cache[key] = ensemble_mae(tracker, key[0], key[1], key[2], cfg)
+            mae = mae_cache[key]
             err = expected_error(mae, c.spread)
             ensemble_records.append(
                 QuarterRecord(

@@ -136,6 +136,13 @@ class AccuracyTracker:
             new_until = min(published_end, snap_end)
             if new_until > until:
                 snap["u"] = _iso(new_until)
+                # Het afgerekende begin is niet meer nodig: inkorten houdt de opslag klein.
+                drop = int((new_until - first) / QUARTER)
+                if 0 < drop < len(values):
+                    snap["v"] = values[drop:]
+                    if "n" in snap:
+                        snap["n"] = snap["n"][drop:]
+                    snap["s"] = _iso(first + drop * QUARTER)
 
         self.prune(now)
         return settled

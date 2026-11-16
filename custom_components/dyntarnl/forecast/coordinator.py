@@ -26,6 +26,7 @@ from ..const import (
     ENSEMBLE,
     FC_BACKOFF_MAX_MIN,
     FC_BACKOFF_START_MIN,
+    FC_SERIES_MAX_AGE_H,
     FC_TIMEOUT,
     LOGGER,
 )
@@ -178,13 +179,27 @@ class DynTarNLForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
                     self.tracker.add_snapshot(
                         key, s.fetched_at, ((p.start, p.price_raw, None) for p in s.points if p.start not in known)
                     )
-                self.tracker.settle(all_slots(prices.get(ELECTRICITY)), now)
+                settled = self.tracker.settle(all_slots(prices.get(ELECTRICITY)), now)
+            else:
+                settled = 0
             data, combined = build(prices, self.series, self.tracker, self.cfg, self.supplier_name, now)
             if self.tracker is not None and snapshot and combined:
                 self.tracker.add_snapshot(
-                    ENSEMBLE, now, [x for x in ensemble_snapshot(combined) if x[0] not in known]
+                    # Looptijd vanaf de oudste bijdragende reeks (niet 'nu'): draagt een bron
+                    # oude data bij omdat de andere in backoff zit, dan telt die fout anders in
+                    # een te korte looptijd-bucket.
+                    ENSEMBLE,
+                    min(
+                        (s.fetched_at for s in self.series.values()
+                         if now - s.fetched_at <= timedelta(hours=FC_SERIES_MAX_AGE_H)),
+                        default=now,
+                    ),
+                    [x for x in ensemble_snapshot(combined) if x[0] not in known],
                 )
-            self._store.async_delay_save(self._data_to_save, _SAVE_DELAY)
+            # Alleen opslaan als er iets veranderde (nieuwe reeks, snapshot of afrekening);
+            # anders schreef elk uur-update ~0,5 MB weg (SD-kaart).
+            if snapshot or settled:
+                self._store.async_delay_save(self._data_to_save, _SAVE_DELAY)
         except Exception:  # noqa: BLE001 - nooit de listener-keten van de prijzen breken
             LOGGER.exception("Voorspellingen samenvoegen mislukt")
             return
