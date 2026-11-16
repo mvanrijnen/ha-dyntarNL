@@ -23,15 +23,23 @@ $TAX_ELEC_EX = 0.09161
 $TAX_GAS_EX  = 0.60066
 
 $now  = Get-Date
-$next = $now.AddHours(1)
+# Vergelijken in UTC: rond de klokwissel is lokale tijd niet eenduidig (dubbel uur in
+# oktober), en "volgend uur" moet één echt uur later zijn.
+$nowUtc  = $now.ToUniversalTime()
+$nextUtc = $nowUtc.AddHours(1)
 
-function To-Local([string]$s) { return [datetimeoffset]::Parse($s).LocalDateTime }
+# Tijdstempel → UTC. Met offset/Z (Frank, EnergyZero) exact; zonder (eon-app, easyEnergy)
+# als lokale Nederlandse tijd.
+function To-Utc([string]$s) {
+    $dto = [datetimeoffset]::Parse($s, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::AssumeLocal)
+    return $dto.UtcDateTime
+}
 
 # Formatteer een prijs als NL-getal (komma), 5 decimalen; lege string bij $null.
 $NL = [Globalization.CultureInfo]::GetCultureInfo("nl-NL")
 function Fmt($v) { if ($null -eq $v) { return "" } return ([double]$v).ToString("0.#####", $NL) }
 
-# Zoek het uur-slot dat $when bevat.
+# Zoek het uur-slot dat $when (UTC) bevat.
 function Get-Slot($slots, [datetime]$when) {
     foreach ($s in $slots) { if ($when -ge $s.Start -and $when -lt $s.End) { return $s } }
     return $null
@@ -53,7 +61,7 @@ function Get-EonApp([string]$Domain) {
             if (-not $block -or -not $block.tariffs) { continue }
             foreach ($t in $block.tariffs) {
                 $g = @{}; foreach ($grp in $t.groups) { $g[$grp.type] = [double]$grp.amount }
-                $res[$e] += New-Slot (To-Local $t.startDateTime) (To-Local $t.endDateTime) `
+                $res[$e] += New-Slot (To-Utc $t.startDateTime) (To-Utc $t.endDateTime) `
                     $g["MARKET_PRICE"] ([double]$t.totalAmount) $g["PURCHASING_FEE"]
             }
         }
@@ -62,20 +70,24 @@ function Get-EonApp([string]$Domain) {
 }
 
 function Get-Frank {
+    # Sinds eind 2026 weigert Frank de oude marketPricesElectricity/marketPricesGas-query
+    # ("Graphql validation error"); nu marketPrices per dag met een resolutie.
     $fields = "from till marketPrice marketPriceTax sourcingMarkupPrice energyTaxPrice"
+    $q = "query MarketPrices(`$date: String!, `$resolution: PriceResolution!) { marketPrices(date: `$date, resolution: `$resolution) { electricityPrices { $fields } gasPrices { $fields } } }"
     $res = @{ electricity = @(); gas = @() }
     foreach ($off in -1, 0, 1) {
-        $s = $now.AddDays($off).ToString("yyyy-MM-dd")
-        $en = $now.AddDays($off + 1).ToString("yyyy-MM-dd")
-        $q = "query{marketPricesElectricity(startDate:`"$s`",endDate:`"$en`"){$fields} marketPricesGas(startDate:`"$s`",endDate:`"$en`"){$fields}}"
-        $body = @{ query = $q } | ConvertTo-Json
-        $data = (Invoke-RestMethod -Uri "https://graphql.frankenergie.nl" -Method Post -ContentType "application/json" -Body $body).data
-        foreach ($pair in @(@("electricity", $data.marketPricesElectricity), @("gas", $data.marketPricesGas))) {
+        $day = $now.AddDays($off).ToString("yyyy-MM-dd")
+        $body = @{ operationName = "MarketPrices"; query = $q; variables = @{ date = $day; resolution = "PT60M" } } | ConvertTo-Json -Depth 4
+        $resp = Invoke-RestMethod -Uri "https://graphql.frankenergie.nl" -Method Post -ContentType "application/json" -Body $body
+        if ($resp.errors -and $off -eq 0) { throw "Frank: $($resp.errors[0].message)" }  # morgen 'nog niet gepubliceerd' is normaal
+        $data = $resp.data.marketPrices
+        if (-not $data) { continue }
+        foreach ($pair in @(@("electricity", $data.electricityPrices), @("gas", $data.gasPrices))) {
             foreach ($r in $pair[1]) {
                 $mex = [double]$r.marketPrice; $market = $mex + [double]$r.marketPriceTax
                 # sourcingMarkupPrice en energyTaxPrice zijn AL incl. btw.
                 $fee = [double]$r.sourcingMarkupPrice; $tax = [double]$r.energyTaxPrice
-                $res[$pair[0]] += New-Slot (To-Local $r.from) (To-Local $r.till) `
+                $res[$pair[0]] += New-Slot (To-Utc $r.from) (To-Utc $r.till) `
                     ([math]::Round($market,5)) ([math]::Round($market + $fee + $tax,5)) ([math]::Round($fee,5))
             }
         }
@@ -84,15 +96,16 @@ function Get-Frank {
 }
 
 function Get-EnergyZero {
-    $from = $now.AddDays(-1).ToString("yyyy-MM-ddT00:00:00.000Z")
-    $till = $now.AddDays(1).ToString("yyyy-MM-ddT23:59:59.999Z")
+    # Lokale middernacht (gisteren) t/m einde van morgen, omgezet naar UTC.
+    $from = $now.Date.AddDays(-1).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.000Z")
+    $till = $now.Date.AddDays(2).ToUniversalTime().AddMilliseconds(-1).ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
     $res = @{ electricity = @(); gas = @() }
     foreach ($pair in @(@("electricity", 1, $TAX_ELEC_EX), @("gas", 2, $TAX_GAS_EX))) {
         $url = "https://api.energyzero.nl/v1/energyprices?fromDate=$from&tillDate=$till&interval=4&usageType=$($pair[1])&inclBtw=false"
         $data = Invoke-RestMethod -Uri $url
         $tax = [math]::Round($pair[2] * $VAT, 5)
         foreach ($r in $data.Prices) {
-            $start = To-Local $r.readingDate
+            $start = To-Utc $r.readingDate
             $market = [math]::Round([double]$r.price * $VAT, 5)
             $res[$pair[0]] += New-Slot $start $start.AddHours(1) $market ([math]::Round($market + $tax,5)) 0.0
         }
@@ -103,14 +116,15 @@ function Get-EnergyZero {
 function Get-EasyEnergy {
     $s = $now.AddDays(-1).ToString("yyyy-MM-dd"); $e = $now.AddDays(2).ToString("yyyy-MM-dd")
     $res = @{ electricity = @(); gas = @() }
-    foreach ($pair in @(@("electricity", "hour"), @("gas", "day"))) {
+    # Gas per uur: 'day' geeft kalenderdaggemiddelden (00–00) i.p.v. de gasdag (06–06).
+    foreach ($pair in @(@("electricity", "hour"), @("gas", "hour"))) {
         $url = "https://price-graph.mijn.easyenergy.com/api/prices?start=$s&end=$e&type=$($pair[0])&granularity=$($pair[1])"
         $data = Invoke-RestMethod -Uri $url
         foreach ($r in $data.prices) {
             # easyEnergy geeft opslag (purchasePrice) en all-in (invoicePrice) mee.
             $market = [double]$r.priceIncVat; $tax = [double]$r.energyTax; $fee = [double]$r.purchasePrice
             $allin = if ($r.invoicePrice) { [double]$r.invoicePrice } else { $market + $fee + $tax }
-            $res[$pair[0]] += New-Slot (To-Local $r.from) (To-Local $r.until) `
+            $res[$pair[0]] += New-Slot (To-Utc $r.from) (To-Utc $r.until) `
                 ([math]::Round($market,5)) ([math]::Round($allin,5)) ([math]::Round($fee,5))
         }
     }
@@ -130,8 +144,8 @@ $rows = foreach ($name in $suppliers.Keys) {
     Write-Host "Ophalen: $name ..." -ForegroundColor Cyan
     try { $data = & $suppliers[$name] } catch { Write-Warning "$name overgeslagen: $($_.Exception.Message)"; continue }
     foreach ($pair in @(@("electricity", "Stroom"), @("gas", "Gas"))) {
-        $cur = Get-Slot $data[$pair[0]] $now
-        $nxt = Get-Slot $data[$pair[0]] $next
+        $cur = Get-Slot $data[$pair[0]] $nowUtc
+        $nxt = Get-Slot $data[$pair[0]] $nextUtc
         [pscustomobject]@{
             Tijdstip    = $now.ToString("yyyy-MM-dd HH:mm")
             Leverancier = $name
