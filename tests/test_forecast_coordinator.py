@@ -281,3 +281,15 @@ def test_flush_writes_pending_state_now():
     store.data.pop("dyntarnl.forecast_flush", None)
     asyncio.run(fc.async_flush())
     assert set(store.data["dyntarnl.forecast_flush"]["series"]) == {A, B}
+
+
+def test_provider_info_survives_restart():
+    fc, _ = _make(entry_id="info")
+    _stub(fc, A, _points(0.1), [])
+    _stub(fc, B, _points(0.2), [])
+    fc.providers[B].info = {"plan": "private_pro", "allowed_horizon_hours": 120}
+    asyncio.run(fc.async_tick())
+    asyncio.run(fc.async_flush())
+    restarted, _ = _make(entry_id="info")
+    asyncio.run(restarted.async_load())
+    assert restarted.providers[B].info == {"plan": "private_pro", "allowed_horizon_hours": 120}

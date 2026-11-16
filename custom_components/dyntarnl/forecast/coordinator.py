@@ -193,7 +193,13 @@ class DynTarNLForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
                 i = int((p.start - first) / QUARTER)
                 values[i] = round(p.price_raw, 6)
                 expanded[i] = int(p.expanded)
-            series[key] = {"f": s.fetched_at.isoformat(), "s": first.isoformat(), "v": values, "e": expanded}
+            series[key] = {
+                "f": s.fetched_at.isoformat(),
+                "s": first.isoformat(),
+                "v": values,
+                "e": expanded,
+                "i": self.providers[key].info if key in self.providers else {},
+            }
         return {
             "series": series,
             "accuracy": self.tracker.to_dict() if self.tracker is not None else self._stored_accuracy,
@@ -221,6 +227,8 @@ class DynTarNLForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
                 LOGGER.warning("Opgeslagen voorspelling van %s overgeslagen (onleesbaar)", key)
                 continue
             self.series[key] = ProviderSeries(key, fetched_at, points)
+            # Wat de bron bij die fetch over zichzelf meldde (plan, horizon, …) ook terug.
+            self.providers[key].info = dict(s.get("i") or {})
             # Anders blijft de last_fetch-sensor na een herstart leeg tot de volgende
             # fetch (tot 6 uur later), terwijl de reeks gewoon vers is.
             self.status[key].last_success = fetched_at
