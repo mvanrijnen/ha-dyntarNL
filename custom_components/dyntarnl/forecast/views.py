@@ -44,9 +44,16 @@ def _summary(records: list[QuarterRecord]) -> dict:
 def cheapest_block(
     records: list[QuarterRecord], now: datetime, hours: int, lookahead_hours: int
 ) -> dict | None:
-    """Goedkoopste aaneengesloten blok van `hours` uur (all-in) vanaf het huidige
-    kwartier, binnen `lookahead_hours`, inclusief voorspelde kwartieren."""
+    """Goedkoopste aaneengesloten blok van `hours` uur (all-in), binnen `lookahead_hours`,
+    inclusief voorspelde kwartieren.
+
+    Het blok begint op de resolutie van de gepubliceerde prijzen (bij uurprijzen: een heel
+    uur) en mag het lopende uur zijn. Anders startte het om bijv. 13:15 en schoof het elk
+    uur een stukje op terwijl het blok al bezig was.
+    """
+    step = int(chart_step(records).total_seconds())
     first = floor_quarter(now)
+    first -= timedelta(seconds=int(first.timestamp()) % step)
     last = first + timedelta(hours=lookahead_hours)
     candidates = [r for r in records if first <= r.start < last and r.price_allin is not None]
     size = max(1, hours * 4)
@@ -57,6 +64,8 @@ def cheapest_block(
             run_start = i  # gat: blok moet aaneengesloten zijn
         if i - run_start + 1 >= size:
             j = i - size + 1
+            if int(candidates[j].start.timestamp()) % step:
+                continue  # blok begint niet op een heel uur (of kwartier bij kwartierprijzen)
             total = sum(r.price_allin for r in candidates[j : i + 1])
             if best is None or total < best[0]:
                 best = (total, j)
@@ -82,7 +91,11 @@ def tomorrow(records: list[QuarterRecord], now: datetime) -> dict | None:
     """Gemiddelde all-in van morgen (lokale datum): gepubliceerd waar het kan."""
     day = (dt_util.as_local(now) + timedelta(days=1)).date()
     chosen = [r for r in records if dt_util.as_local(r.start).date() == day and r.price_allin is not None]
-    if not chosen:
+    # Alleen een hele dag (23/24/25 uur rond de klokwissel): een gemiddelde over alleen de
+    # ochtend (korte horizon, verouderde reeks) zag eruit als het daggemiddelde.
+    start = dt_util.as_utc(dt_util.start_of_local_day(day))
+    end = dt_util.as_utc(dt_util.start_of_local_day(day + timedelta(days=1)))
+    if not chosen or len(chosen) < (end - start) / QUARTER:
         return None
     return {"date": day.isoformat(), "coverage_hours": len(chosen) / 4, **_summary(chosen)}
 
@@ -127,6 +140,8 @@ def forecast_chart(
     allin, market, band = [], [], []
     for ts in sorted(groups):
         group = groups[ts]
+        if len(group) < size // int(QUARTER.total_seconds()):
+            continue  # onvolledig uur aan de rand van de horizon: geen halve kolom tonen
         begin = dt_util.as_utc(datetime.fromtimestamp(ts, tz=dt_util.UTC))
         slot = apply_formula(begin, begin + step, sum(r.price_raw for r in group) / len(group), tariff)
         ms = ts * 1000
@@ -188,6 +203,11 @@ def service_response(
         "supplier": supplier,
         "vat_percentage": ed.vat_percentage if ed else None,
         "forecast_enabled": enabled,
+        # Welke voorspelling 'ensemble' is: het gewogen ensemble, of (ensemble uit) per
+        # kwartier de eerste bron met een waarde.
+        "forecast_series": (
+            None if not use_forecast else ("ensemble" if cfg.ensemble else "first_available_provider")
+        ),
         "generated_at": dt_util.as_local(now).isoformat(),
         "records": clip(records),
     }

@@ -148,3 +148,40 @@ def test_service_while_forecast_is_starting_up():
     assert {r["source"] for r in out["records"]} == {"published"}
     with pytest.raises(ValueError):
         service_response(prices_data(), None, c, "Essent", ELECTRICITY, True, "nope", None, NOW)
+
+
+# --- bughunt ronde 7 --------------------------------------------------------------------
+
+
+def test_tomorrow_partial_forecast_is_not_shown_as_day_average():
+    """Korte horizon: alleen de ochtend van morgen bekend → geen 'daggemiddelde'."""
+    data, _ = _forecast([0.10] * 44)  # 11 uur van morgen
+    assert tomorrow(data.merged, NOW) is None
+
+
+def test_forecast_chart_drops_partial_hour_at_the_edge():
+    from dyntarnl.forecast.views import forecast_chart
+
+    data, _ = _forecast([0.10] * 4 + [0.50] * 2)  # tweede uur maar half voorspeld
+    allin, _, _ = forecast_chart(data.merged, data.tariff)
+    assert len(allin) == 1
+
+
+def test_cheapest_block_starts_on_a_whole_hour_and_stays_put():
+    """Om 14:20 met het lopende uur als goedkoopste: start 14:00, niet 14:15."""
+    hours = [0.30] * 24
+    hours[16] = 0.01  # 16-08 22:00 UTC + 16 u = 14:00 UTC... lokaal 16:00 (stub +02:00)
+    data, _ = _forecast([0.40] * 8, prices=prices_data(hours))
+    now = DAY_START + timedelta(hours=16, minutes=20)  # midden in het goedkope uur
+    block = cheapest_block(data.merged, now, 1, 48)
+    assert block["start"] == DAY_START + timedelta(hours=16)
+    assert block["start"].minute == 0
+
+
+def test_service_says_which_forecast_series_it_used():
+    data, c = _forecast([0.10] * 8, [0.12] * 8)
+    out = service_response(prices_data(), data, c, "Essent", ELECTRICITY, True, "ensemble", None, NOW)
+    assert out["forecast_series"] == "ensemble"
+    off = cfg(**{"forecast_ensemble": False})
+    out = service_response(prices_data(), data, off, "Essent", ELECTRICITY, True, "ensemble", None, NOW)
+    assert out["forecast_series"] == "first_available_provider"

@@ -423,9 +423,9 @@ op het ophalen of tonen van de gepubliceerde prijzen.**
 
 | Entiteit | Wat |
 | --- | --- |
-| `sensor.dyntarnl_e_cheapest_block_start` | Start van het goedkoopste aaneengesloten blok van N uur (standaard 3) in de komende 48 uur, inclusief voorspellingen. Attributen: `end`, `avg_price_allin`, `source` (`published`/`forecast`/`mixed`), `expected_error_allin` |
+| `sensor.dyntarnl_e_cheapest_block_start` | Start van het goedkoopste aaneengesloten blok van N uur (standaard 3) in de komende 48 uur, inclusief voorspellingen; begint op een heel uur. Attributen: `end`, `avg_price_allin`, `source` (`published`/`forecast`/`mixed`), `expected_error_allin` |
 | `sensor.dyntarnl_e_all_in_forecast_avg` | Gemiddelde all-in prijs over de komende 24 uur. Draagt de volledige reeks `prices` (`[epoch-ms, all-in, "p"\|"f"]`) en `error_band` voor grafieken. Die attributen worden **niet** in de recorder opgeslagen |
-| `sensor.dyntarnl_e_tomorrow_avg_forecast` | Gemiddelde all-in van morgen: gepubliceerd als dat er is, anders voorspeld (met `source`) |
+| `sensor.dyntarnl_e_tomorrow_avg_forecast` | Gemiddelde all-in van morgen: gepubliceerd als dat er is, anders voorspeld (met `source`); alleen als de hele dag bekend is |
 | `sensor.dyntarnl_forecast_<bron>_mae` / `_bias` / `_settled` / `_weight` / `_last_fetch` | Diagnostiek per bron: gemeten fout, systematische fout, aantal afgerekende kwartieren, huidig gewicht en ophaalstatus. `_mae`/`_bias`/`_settled` alleen met *Nauwkeurigheid meten* aan, `_weight` alleen met het ensemble aan |
 | `sensor.dyntarnl_forecast_ensemble_mae` / `_settled` | Gemeten fout van het ensemble, per bucket en per aantal bronnen (alleen met ensemble én nauwkeurigheidsmeting aan) |
 

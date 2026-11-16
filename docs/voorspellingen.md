@@ -191,9 +191,9 @@ de bijbehorende entiteiten en het device zelf op.
 
 | Entiteit | State | Belangrijkste attributen |
 | --- | --- | --- |
-| `sensor.dyntarnl_e_cheapest_block_start` | Start van het goedkoopste aaneengesloten blok van N uur in de komende 48 uur, inclusief voorspellingen | `end`, `hours`, `avg_price_allin`, `avg_price_raw`, `source`, `providers`, `expected_error_allin` |
+| `sensor.dyntarnl_e_cheapest_block_start` | Start van het goedkoopste aaneengesloten blok van N uur in de komende 48 uur, inclusief voorspellingen. Begint altijd op een heel uur; dat mag het lopende uur zijn (dan blijft de start staan zolang het blok loopt) | `end`, `hours`, `avg_price_allin`, `avg_price_raw`, `source`, `providers`, `expected_error_allin` |
 | `sensor.dyntarnl_e_all_in_forecast_avg` | Gemiddelde all-in prijs komende 24 uur | `source`, `coverage_hours`, `forecast_until`, `prices` (alles per kwartier) en de grafiekreeksen `forecast`, `forecast_market`, `error_band` (alleen voorspeld, per uur) |
-| `sensor.dyntarnl_e_tomorrow_avg_forecast` | Gemiddelde all-in van morgen: gepubliceerd als dat er is, anders voorspeld | `date`, `source`, `coverage_hours`, `expected_error_allin` |
+| `sensor.dyntarnl_e_tomorrow_avg_forecast` | Gemiddelde all-in van morgen: gepubliceerd als dat er is, anders voorspeld. Alleen als de hele dag bekend is (bij een korte horizon dus soms leeg) | `date`, `source`, `coverage_hours`, `expected_error_allin` |
 
 `source` is `published`, `forecast` of `mixed` (een deel gepubliceerd, een deel voorspeld).
 
@@ -230,8 +230,12 @@ data:
 response_variable: prijzen
 ```
 
+Het veld `forecast_series` zegt welke voorspelling er in `records` zit: `ensemble`, of met
+het ensemble uit `first_available_provider` (per kwartier de eerste bron met een waarde).
+
 Met `provider: all` krijg je naast de samengevoegde reeks ook elke bron apart onder
-`providers`.
+`providers`. Dat is groot (bij 168 uur horizon ruim 0,6 MB) en HA bewaart response-variabelen
+in de traces van een automatisering; gebruik het liever niet in een automatisering die vaak draait.
 
 Elk record in `records`:
 

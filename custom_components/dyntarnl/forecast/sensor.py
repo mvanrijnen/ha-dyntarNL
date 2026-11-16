@@ -151,7 +151,8 @@ def _bucket_attrs(c: Coord, provider: str) -> dict:
         out[bucket] = (
             {"mae": _r(stat.mae, 6), "bias": _r(stat.bias, 6), "settled": stat.count} if stat else None
         )
-    return {"buckets": out, "window_days": c.cfg.window_days, "unit": PRICE_UNIT}
+    # Basis: de kale EPEX-prijs zonder btw (anders dan expected_error_allin, incl. btw).
+    return {"buckets": out, "window_days": c.cfg.window_days, "unit": PRICE_UNIT, "basis": "EPEX excl. btw"}
 
 
 def _stat(c: Coord, provider: str, field: str) -> float | None:
@@ -188,7 +189,10 @@ def _status_attrs(c: Coord, provider: str) -> dict:
 
 
 def _ensemble_attrs(c: Coord) -> dict:
-    out: dict = {"buckets": {}, "by_sources": {}, "window_days": c.cfg.window_days, "unit": PRICE_UNIT}
+    out: dict = {
+        "buckets": {}, "by_sources": {}, "window_days": c.cfg.window_days, "unit": PRICE_UNIT,
+        "basis": "EPEX excl. btw",
+    }
     if c.tracker is None:
         return out
     for bucket, _, _ in LEAD_BUCKETS:
