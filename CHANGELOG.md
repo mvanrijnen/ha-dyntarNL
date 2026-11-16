@@ -13,9 +13,10 @@ oudere versies staan op de [releases-pagina](https://github.com/mvanrijnen/ha-dy
 
 ### In het kort
 
-- **Nieuw: prijsvoorspellingen tot 7 dagen vooruit (optioneel).** Uit twee externe bronnen,
-  omgerekend met de formule van jouw eigen leverancier, met een gewogen ensemble en een
-  automatische meting van hoe nauwkeurig elke bron is.
+- **Nieuw: prijsvoorspellingen tot 7 dagen vooruit (optioneel).** DynTarNL voorspelt zelf
+  niets: het leest de voorspellingen van twee externe voorspellers uit, middelt ze gewogen
+  (ensemble) en corrigeert ze (formule van jouw eigen leverancier, optionele biascorrectie), en
+  meet automatisch hoe nauwkeurig elke bron is.
 - **Nieuw: instellingen achteraf aanpassen** via *Configureren* op de integratie (options flow).
 - **Nieuw: leverancier of eigen tarieven wijzigen** via *Opnieuw configureren*, zonder de
   integratie te verwijderen. Entiteiten en hun historie blijven behouden.
@@ -127,6 +128,26 @@ opgeruimd.
 - Een eigen leverancier (*Custom supplier*) toevoegen gaf "Unknown error occurred". Dat zat ook
   al in 1.0.2 ([#3](https://github.com/mvanrijnen/ha-dyntarNL/issues/3)). Dank aan @hbvdh voor
   de analyse.
+- **Zomer-/wintertijd:** bij de klokwissel gaven "nu", "volgend uur" en "vorig uur" soms een
+  uur te vroeg of te laat (o.a. het dubbele uur in oktober); easyEnergy schoof op de dag van de
+  zomertijd alle prijzen een uur op en miste 23:00.
+- **Gas bij easyEnergy** (en Custom met easyEnergy als bron) gebruikte daggemiddelden per
+  kalenderdag in plaats van de gasdag (06:00–06:00): op dagen dat de gasprijs veranderde klopte
+  de prijs niet.
+- **Eén mislukte ophaalactie** (bijv. om middernacht) maakte alle sensoren tot de volgende dag
+  onbeschikbaar. Nu blijven de bekende prijzen beschikbaar, wordt de nieuwe dag uit de cache
+  ingedeeld, wordt elk uur opnieuw geprobeerd en blijft de Ververs-knop altijd bruikbaar.
+- **Gas van morgen:** DynTarNL stopte met opnieuw proberen zodra er één uur van morgen bekend
+  was; nu pas als morgen tot 24:00 binnen is.
+- **Energy Price Forecast EU** levert per uur nu vier verschillende kwartierwaarden; die werden
+  samengevoegd tot één waarde (fouten tot ~2 ct/kWh). De diagnose-sensor toont nu ook je plan,
+  horizon en of je API-key werkt.
+- Kleinere fixes: een echte beursprijs van precies €0 gaf een extra (soms falende) aanroep; de
+  btw-terugrekening van opslag/belasting kon bij heel lage prijzen tot 21% afwijken; EnergyZero
+  miste het eerste uur van gisteren; foutmeldingen van Frank werden genegeerd; de dag-reeksen
+  van de `now`-sensoren gaan niet meer de recorder in; opnieuw configureren terwijl de
+  leverancier onbereikbaar is werkt direct; opties opslaan blokkeert niet meer als een
+  voorspelbron even onbereikbaar is; na het verwijderen blijft geen opslagbestand achter.
 - **Frank Energie** gaf geen prijzen meer: Frank weigert sinds kort de oude prijsquery
   ("Graphql validation error"). DynTarNL gebruikt nu de nieuwe `marketPrices`-query. Dit
   raakte ook Custom met Frank als bron voor de beursprijs.

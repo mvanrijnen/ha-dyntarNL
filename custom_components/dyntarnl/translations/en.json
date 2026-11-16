@@ -111,7 +111,7 @@
     "step": {
       "init": {
         "title": "Price forecasts",
-        "description": "Optionally extend the published day-ahead prices with EPEX price forecasts from external sources, up to 7 days ahead. Off by default: when off, nothing changes (no extra API calls, no extra entities).",
+        "description": "Optionally extend the published day-ahead prices with EPEX price forecasts up to 7 days ahead. DynTarNL does not forecast itself: it reads the forecasts of external forecasters, averages them (weighted by measured accuracy) and converts them with your supplier's tariffs. Off by default: when off, nothing changes (no extra API calls, no extra entities).",
         "data": {
           "forecast_enabled": "Enable price forecasts"
         }

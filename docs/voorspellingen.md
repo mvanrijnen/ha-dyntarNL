@@ -5,6 +5,18 @@ Vanaf versie 1.1 kan DynTarNL de gepubliceerde day-ahead stroomprijzen aanvullen
 instellen, welke entiteiten je krijgt, hoe je de voorspelling in een grafiek zet en hoe je
 die grafiek leest.
 
+> **DynTarNL voorspelt zelf niets.** Het heeft geen eigen prijsmodel, maar:
+>
+> - **leest** de voorspellingen van externe voorspellers uit (zie [Hoe het werkt](#hoe-het-werkt));
+> - **middelt** ze per kwartier gewogen, waarbij een bron die nauwkeuriger bleek zwaarder weegt
+>   ([Ensemble en weging](#ensemble-en-weging));
+> - **corrigeert** ze: omgerekend naar jouw all-in prijs (opslag, energiebelasting, btw van je
+>   leverancier) en optioneel ontdaan van een gemeten systematische afwijking per bron.
+>
+> Daarnaast meet het achteraf hoe goed elke bron was ([Nauwkeurigheid en verwachte
+> fout](#nauwkeurigheid-en-verwachte-fout)). De kwaliteit van de voorspelling zelf komt van de
+> voorspellers.
+
 > **Standaard uit.** Zolang je de optie niet aanzet verandert er niets: geen extra API-calls,
 > geen extra entiteiten en geen andere sensoren of attributen.
 
@@ -191,7 +203,7 @@ groeit er niet van.
 | `sensor.dyntarnl_forecast_<bron>_bias` | Gemiddelde afwijking: positief = voorspelt te hoog |
 | `sensor.dyntarnl_forecast_<bron>_settled` | Aantal afgerekende kwartieren in het venster (`settled_total` = sinds het begin) |
 | `sensor.dyntarnl_forecast_<bron>_weight` | Huidig gewicht in het ensemble (%), per looptijd in `buckets` |
-| `sensor.dyntarnl_forecast_<bron>_last_fetch` | Laatste geslaagde ophaalactie. Attributen: `status` (`ok`/`backoff`/`pending`), `last_error`, `next_attempt`, `points`, `forecast_until` |
+| `sensor.dyntarnl_forecast_<bron>_last_fetch` | Laatste geslaagde ophaalactie. Attributen: `status` (`ok`/`backoff`/`pending`), `last_error`, `next_attempt`, `points`, `forecast_until`. Bij Energy Price Forecast EU ook wat de bron zelf meldt: `plan` (bijv. `free` of Pro), `allowed_horizon_hours`, `api_key_state` (zo zie je of je key werkt) en `expansion_method` (hoe uurvoorspellingen naar kwartieren gaan) |
 
 `<bron>` is `epexpredictor` of `energypriceforecast`. Voor het ensemble zijn er
 `sensor.dyntarnl_forecast_ensemble_mae` (met de fout per looptijd én per aantal bronnen) en

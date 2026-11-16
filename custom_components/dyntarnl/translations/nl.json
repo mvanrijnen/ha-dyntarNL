@@ -111,7 +111,7 @@
     "step": {
       "init": {
         "title": "Prijsvoorspellingen",
-        "description": "Vul de gepubliceerde day-ahead prijzen optioneel aan met EPEX-prijsvoorspellingen uit externe bronnen, tot 7 dagen vooruit. Standaard uit: staat dit uit, dan verandert er niets (geen extra API-calls, geen extra entiteiten).",
+        "description": "Vul de gepubliceerde day-ahead prijzen optioneel aan met EPEX-prijsvoorspellingen tot 7 dagen vooruit. DynTarNL voorspelt zelf niets: het leest de voorspellingen van externe voorspellers uit, middelt ze (gewogen naar gemeten nauwkeurigheid) en rekent ze om met de tarieven van je leverancier. Standaard uit: staat dit uit, dan verandert er niets (geen extra API-calls, geen extra entiteiten).",
         "data": {
           "forecast_enabled": "Prijsvoorspellingen aanzetten"
         }

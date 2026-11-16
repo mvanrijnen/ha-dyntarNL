@@ -15,8 +15,9 @@ Prijs-sensoren (all-in & beurs) voor stroom en gas, component-sensoren (belastin
 en teruglever-/negatieve-prijs binary sensors om direct op te schakelen (ZeroExport / accu).
 
 ## Optioneel: prijsvoorspellingen (vanaf 1.1)
-Standaard uit. Aan te zetten via *Configureren*: EPEX-voorspellingen tot 7 dagen vooruit
-(EpexPredictor, Energy Price Forecast EU), met je eigen leveranciersformule, een gewogen
-ensemble en automatische nauwkeurigheidsmeting. Volledige reeksen via `dyntarnl.get_prices`.
+Standaard uit. Aan te zetten via *Configureren*. DynTarNL voorspelt zelf niets: het leest
+EPEX-voorspellingen tot 7 dagen vooruit uit bij externe voorspellers (EpexPredictor, Energy
+Price Forecast EU), middelt ze gewogen, en corrigeert ze met je eigen leveranciersformule en
+hun gemeten nauwkeurigheid. Volledige reeksen via `dyntarnl.get_prices`.
 
 > Onofficieel; geen affiliatie met de leveranciers.

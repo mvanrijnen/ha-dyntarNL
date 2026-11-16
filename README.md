@@ -14,9 +14,11 @@ leveranciers** als sensoren publiceert. Je kiest je leverancier; de integratie b
 welk platform en welke publieke prijs-API erbij hoort. **Geen account of API-sleutel nodig**
 voor de ondersteunde leveranciers.
 
-**Optioneel:** [prijsvoorspellingen tot 7 dagen vooruit](#prijsvoorspellingen-optioneel), omgerekend
-met de tarieven van jouw leverancier. Handig om laden, de thuisaccu of de wasmachine verder
-vooruit te plannen dan de day-ahead prijzen reiken. Standaard uit.
+**Optioneel:** [prijsvoorspellingen tot 7 dagen vooruit](#prijsvoorspellingen-optioneel). DynTarNL
+voorspelt daarbij **zelf niets**: het leest de voorspellingen van externe voorspellers uit,
+middelt ze gewogen en corrigeert ze (met de tarieven van jouw leverancier en hun gemeten
+nauwkeurigheid). Handig om laden, de thuisaccu of de wasmachine verder vooruit te plannen dan
+de day-ahead prijzen reiken. Standaard uit.
 
 > ## Stabiel — klaar voor dagelijks gebruik
 >
@@ -324,6 +326,18 @@ De prijs-*array* verandert maar een paar keer per dag, dus de integratie is zuin
 Vanaf 1.1 kan DynTarNL de gepubliceerde day-ahead prijzen aanvullen met **voorspellingen tot
 7 dagen vooruit**. De optie staat **standaard uit**. Zolang hij uit staat verandert er niets:
 geen extra API-calls, geen extra entiteiten en geen andere sensoren of attributen.
+
+> **DynTarNL is zelf geen voorspeller.** Het heeft geen eigen prijsmodel. Het doet drie dingen
+> met de voorspellingen van externe voorspellers:
+>
+> 1. **Uitlezen:** de kale EPEX-voorspelling ophalen bij elke gekozen bron.
+> 2. **Middelen:** per kwartier een gewogen gemiddelde van de bronnen (het ensemble), waarbij
+>    bronnen die nauwkeuriger bleken zwaarder wegen.
+> 3. **Corrigeren:** omrekenen met de opslag, energiebelasting en btw van jouw leverancier, en
+>    optioneel een gemeten systematische afwijking per bron eraf halen. Daarnaast meet DynTarNL
+>    hoe nauwkeurig elke bron achteraf was, en toont het een verwachte fout.
+>
+> Hoe goed de voorspelling is, hangt dus af van de voorspellers zelf.
 
 > 📖 De volledige uitleg (alle opties, de berekeningen, de grafiek en problemen oplossen) staat
 > in [docs/voorspellingen.md](docs/voorspellingen.md).
