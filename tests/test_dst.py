@@ -103,3 +103,18 @@ def test_energyzero_fall_back_hour_has_its_own_price(real_tz, monkeypatch):
     # 02:30 CET (01:30Z) hoort bij het 01Z-uur, niet bij het CEST-uur ervoor.
     found = slot_at(slots, datetime(2026, 10, 25, 1, 30, tzinfo=UTC))
     assert found.market_ex == pytest.approx(0.11)
+
+
+def test_true_local_end_labels_are_also_handled(real_tz):
+    """Schrijft de bron het echte lokale eind (eind = volgende start), ook rond de klokwissel."""
+    from dyntarnl.model import localize_naive_slots
+
+    starts = ["2026-10-25T01:00:00", "2026-10-25T02:00:00", "2026-10-25T02:00:00", "2026-10-25T03:00:00"]
+    ends = ["2026-10-25T02:00:00", "2026-10-25T02:00:00", "2026-10-25T03:00:00", "2026-10-25T04:00:00"]
+    spans = localize_naive_slots(starts, ends)
+    hours = [round((e.timestamp() - s.timestamp()) / 3600) for s, e in spans]
+    assert hours == [1, 1, 1, 1]
+    starts = ["2026-03-29T00:00:00", "2026-03-29T01:00:00", "2026-03-29T03:00:00"]
+    ends = ["2026-03-29T01:00:00", "2026-03-29T03:00:00", "2026-03-29T04:00:00"]
+    spans = localize_naive_slots(starts, ends)
+    assert [round((e.timestamp() - s.timestamp()) / 3600) for s, e in spans] == [1, 1, 1]

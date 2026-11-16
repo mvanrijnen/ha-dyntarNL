@@ -50,15 +50,30 @@ def test_failed_fetch_is_retried_every_hour(started):
     assert entry.tasks == []  # gewoon meerollen, geen netwerk
 
 
-def test_tomorrow_retry_also_after_failure(started):
+def test_tomorrow_retry_leaves_failures_to_the_hourly_tick(started):
+    """Na een mislukte fetch probeert het uur-tik opnieuw; de half-uur-retry niet ook nog
+    (anders 3 aanroepen per uur tijdens een storing)."""
     entry, _, retry, _ = started
     coordinator = entry.runtime_data
     entry.tasks.clear()
     retry()
-    assert entry.tasks == []  # morgen compleet en vorige fetch gelukt
+    assert entry.tasks == []  # morgen compleet
     coordinator.last_update_success = False
     retry()
-    assert entry.tasks == ["dyntarnl_fetch"]
+    assert entry.tasks == []
+
+
+def test_sensors_keep_rolling_forward_during_an_outage(started):
+    """Na een tweede mislukte fetch stuurt HA geen updates meer; het uur-tik moet de
+    sensoren dan zelf laten meerollen, anders blijft 'nu' op het uur van de storing staan."""
+    entry, hourly, _, _ = started
+    coordinator = entry.runtime_data
+    calls = []
+    coordinator.async_add_listener(lambda: calls.append(1))
+    coordinator.last_update_success = False
+    entry.tasks.clear()
+    hourly(datetime(2026, 8, 17, 15, 0, 10, tzinfo=AMS))
+    assert calls and entry.tasks == ["dyntarnl_fetch"]
 
 
 def test_midnight_rebuckets_from_cache_before_fetching(started, at_time):

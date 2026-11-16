@@ -386,3 +386,22 @@ def test_forecast_sensors_carry_attribution():
     assert len(attributions) == 1
     text = attributions.pop()
     assert "CC-BY-4.0" in text and "Open-Meteo" in text and "Energy Price Forecast EU" in text
+
+
+def test_tomorrow_forecast_is_kept_until_the_supplier_publishes(at_time):
+    """Rond 14:00 levert een voorspeller morgen niet meer (al bekend bij EPEX); tot de
+    leverancier publiceert moet de eerdere voorspelling voor morgen blijven staan."""
+    fc, _ = _make()
+    _stub(fc, A, _points(0.10, hours=48), [])
+    _stub(fc, B, _points(0.12, hours=48), [])
+    asyncio.run(fc.async_tick())
+    at_time(NOW + timedelta(hours=6))
+    later = [ForecastPoint(TOMORROW + timedelta(days=1) + i * QUARTER, 0.2) for i in range(96)]  # alleen overmorgen
+    _stub(fc, A, later, [])
+    _stub(fc, B, later, [])
+    asyncio.run(fc.async_tick())
+    starts = {p.start for p in fc.series[A].points}
+    assert TOMORROW + timedelta(hours=12) in starts  # morgen nog aanwezig
+    assert TOMORROW + timedelta(days=1) in starts  # nieuwe reeks erbij
+    tomorrow_rows = [r for r in fc.data.merged if TOMORROW <= r.start < TOMORROW + timedelta(days=1)]
+    assert len(tomorrow_rows) == 96

@@ -229,6 +229,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -> 
             coordinator.async_rebucket()
             _fetch()
         elif not coordinator.last_update_success:
+            # Eerst uit de cache laten meerollen: na een tweede mislukte fetch stuurt HA geen
+            # updates meer, en dan bleven 'nu'/'volgend uur' op het uur van de storing staan.
+            coordinator.async_update_listeners()
             _fetch()
         else:
             coordinator.async_update_listeners()
@@ -240,9 +243,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -> 
 
     @callback
     def _retry_tomorrow(_now=None) -> None:
-        """Elk half uur vanaf 13:00: alleen ophalen zolang morgen nog ontbreekt (of de
-        vorige poging mislukte)."""
-        if not coordinator.last_update_success or not tomorrow_complete(coordinator.data):
+        """Elk half uur vanaf 13:00: alleen ophalen zolang morgen nog ontbreekt. Mislukte de
+        vorige poging, dan doet het uur-tik het opnieuw proberen (niet 3x per uur)."""
+        if coordinator.last_update_success and not tomorrow_complete(coordinator.data):
             _fetch()
 
     # 2) Doorproberen tot de prijzen van morgen binnen zijn (ook 's avonds). Elk half

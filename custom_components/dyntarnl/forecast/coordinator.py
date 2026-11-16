@@ -33,7 +33,7 @@ from ..const import (
 )
 from .accuracy import STORAGE_VERSION, AccuracyTracker
 from .engine import ForecastData, all_slots, build, ensemble_snapshot, published_records
-from .model import QUARTER, ForecastConfig, ForecastPoint, ProviderSeries
+from .model import QUARTER, ForecastConfig, ForecastPoint, ProviderSeries, floor_quarter
 from .providers import PROVIDERS, ForecastProvider
 
 # Een fetch die net iets te vroeg valt (tick om de 15 min) telt toch als op tijd.
@@ -164,8 +164,23 @@ class DynTarNLForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
         status.last_error = None
         status.next_attempt = None
         status.last_success = now
-        self.series[key] = ProviderSeries(key, now, points)
+        self.series[key] = ProviderSeries(key, now, self._carry_over(key, points, now))
         return True
+
+    def _carry_over(self, key: str, points: list[ForecastPoint], now: datetime) -> list[ForecastPoint]:
+        """Oude voorspelde kwartieren vóór de nieuwe reeks bewaren (tot ze gepubliceerd zijn).
+
+        Na ~13:00 kent een voorspeller de EPEX-prijzen van morgen al en levert hij die niet
+        meer als voorspelling; publiceert de leverancier pas later (bijv. 14:30), dan viel er
+        tussen die momenten een gat in 'morgen'. De nieuwe reeks wint waar hij waarden heeft.
+        """
+        old = self.series.get(key)
+        if old is None or not points:
+            return points
+        first_new = points[0].start
+        floor = floor_quarter(now)
+        kept = [p for p in old.points if floor <= p.start < first_new]
+        return kept + points
 
     async def _async_update_data(self) -> ForecastData | None:
         await self.async_tick(force=True)

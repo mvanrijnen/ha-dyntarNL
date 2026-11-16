@@ -63,8 +63,14 @@ def localize_naive_slots(starts: list[str], ends: list[str]) -> list[tuple[datet
     los omzetten gaf rond de klokwissel overlappende slots (bijv. een eind '02:00' dat in
     maart niet bestaat, of een dubbel '03:00' in oktober).
     """
+    localized = localize_naive_series(starts)
     out = []
-    for start, s_raw, e_raw in zip(localize_naive_series(starts), starts, ends):
+    for i, (start, s_raw, e_raw) in enumerate(zip(localized, starts, ends)):
+        # Eind == begin van het volgende slot (zelfde label): dan is dát het eind, in echte
+        # tijd. Werkt ongeacht hoe de bron rond de klokwissel zijn eindlabels schrijft.
+        if i + 1 < len(starts) and e_raw == starts[i + 1]:
+            out.append((start, localized[i + 1]))
+            continue
         naive_start = dt_util.parse_datetime(s_raw)
         naive_end = dt_util.parse_datetime(e_raw)
         if naive_start is None or naive_end is None:
