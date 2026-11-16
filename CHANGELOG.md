@@ -3,6 +3,44 @@
 Alle noemenswaardige wijzigingen. Versies volgen [semver](https://semver.org/lang/nl/);
 oudere versies staan op de [releases-pagina](https://github.com/mvanrijnen/ha-dyntarNL/releases).
 
+## 1.1.1
+
+Bugfix-release: resultaat van een uitgebreide bughunt. Geen gewijzigde entiteiten of
+instellingen; gewoon bijwerken.
+
+### Prijzen
+
+- **Storing bij de leverancier:** "nu"/"volgend uur" bleven vanaf de tweede mislukte poging de
+  rest van de dag op de prijs van dat moment staan. Ze rollen nu door op de prijzen die al
+  binnen waren; tijdens een storing wordt één keer per uur opnieuw geprobeerd (niet drie keer).
+- **Zomer-/wintertijd:** slots worden op echte tijd vergeleken; naïeve tijden (Essent,
+  Energiedirect, easyEnergy) worden correct omgezet, ook rond het dubbele/ontbrekende uur.
+  easyEnergy-gas wordt per uur opgehaald.
+- **Om middernacht** schuiven vandaag/morgen direct door uit de cache, vóór de nieuwe fetch.
+- **Strengere controle** van de bron-data (ontbrekende of onmogelijke waarden → nette fout
+  i.p.v. verkeerde prijzen); sensoren blijven beschikbaar op de laatst bekende prijzen.
+- Frank Energie: aangepast aan de gewijzigde API.
+
+### Voorspellingen
+
+- Geen gat meer in de voorspelling voor morgen tussen de EPEX-uitslag (~13:00) en het moment
+  dat je leverancier publiceert.
+- "Morgen gemiddeld" toont alleen een waarde als de hele dag bekend is.
+- Het goedkoopste blok begint op een heel uur en schuift niet op terwijl het loopt.
+- Geen halve kolom meer aan het eind van de grafiekreeks.
+- `get_prices` meldt welke reeks er in `records` zit (`forecast_series`).
+- Opslag: kleiner, alleen schrijven bij wijzigingen, niets verloren bij herladen tijdens het
+  inlezen, niets achtergelaten na verwijderen.
+- **Bronvermelding** (attribution) op de voorspel-sensoren: EpexPredictor gebruikt
+  energy-charts.info / ENTSO-E (CC-BY-4.0) en Open-Meteo.com.
+
+### Overig
+
+- Leverancier wijzigen (*Opnieuw configureren*) terwijl HA nog opstart, wordt direct toegepast.
+- Foutmeldingen bevatten geen inloggegevens uit een eigen URL; minder logberichten bij een
+  storing van een voorspeller.
+- Ruim 200 tests, waaronder tests in een echte Home Assistant.
+
 ## 1.1.0
 
 > **Dit is de versie die eerder als "2.0" werd aangekondigd**
