@@ -123,3 +123,27 @@ def test_epf_unexpected_format_is_an_error():
     with pytest.raises(ProviderError):
         asyncio.run(provider.async_fetch(None, 48))
     assert asyncio.run(provider.async_validate(None)) == "cannot_connect"
+
+
+def test_epf_linear_center_keeps_each_quarter(load_fixture):
+    """Live-API (nov 2026): 'linear_center' = vier verschillende waarden per uur.
+    Die mogen niet worden samengevoegd tot één uurwaarde (gaf fouten tot ~2 ct/kWh)."""
+    payload = load_fixture("energypriceforecast_nl_linear.json")
+    provider = EnergyPriceForecastProvider({})
+    provider._get_json = _fake(payload, [])
+
+    points = asyncio.run(provider.async_fetch(None, 48))
+
+    forecast = {
+        datetime.fromisoformat(e["start"].replace("Z", "+00:00")): e
+        for e in payload["entries"]
+        if e["source"] == "forecast"
+    }
+    assert {e["expansion_method"] for e in forecast.values()} == {"linear_center"}
+    assert len(points) == len(forecast)
+    for p in points:
+        assert p.price_raw == pytest.approx(forecast[p.start]["value"])
+        assert p.expanded  # afgeleid van een uurwaarde
+    # binnen één uur verschillende waarden
+    first_hour = [p.price_raw for p in points[:4]]
+    assert len(set(first_hour)) > 1

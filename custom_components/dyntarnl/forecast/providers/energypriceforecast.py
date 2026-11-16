@@ -22,7 +22,7 @@ import voluptuous as vol
 from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
 
 from ...const import CONF_FC_EPF_API_KEY, EPF_URL, PROVIDER_EPF
-from ..model import ForecastPoint
+from ..model import ForecastPoint, floor_quarter
 from .base import ForecastProvider, ProviderAuthError, ProviderError, parse_utc, to_quarters
 
 _REJECTED_KEY_STATES = frozenset({"invalid", "invalid_format", "revoked", "inactive", "expired"})
@@ -84,16 +84,21 @@ class EnergyPriceForecastProvider(ForecastProvider):
             price = float(e["value"]) * factor
             forecast_starts.add(parse_utc(e["start"]))
             native = int(e.get("native_resolution_minutes") or 15)
-            if native >= 60 or e.get("expansion_method") == "repeat_hourly":
-                # De bron herhaalt het uur zelf al over vier kwartieren; wij nemen het
-                # uur één keer en verdelen het zelf, zodat het als `expanded` telt.
+            method = e.get("expansion_method")
+            if method == "repeat_hourly" or (method is None and native >= 60):
+                # Eén uurwaarde, door de bron herhaald over vier kwartieren: wij nemen
+                # het uur één keer en verdelen het zelf (telt als `expanded`).
                 native_start = parse_utc(e.get("native_start") or e["start"])
                 hourly_rows.append((native_start, price))
             else:
-                quarter_rows.append((parse_utc(e["start"]), price))
+                # Eigen waarde per kwartier (ook bij interpolatie, bijv. 'linear_center':
+                # vier verschillende waarden per uur). Afgeleid van een uurwaarde = expanded.
+                quarter_rows.append((parse_utc(e["start"]), price, native >= 60))
 
         points = {p.start: p for p in to_quarters(hourly_rows, native_minutes=60)}
-        points.update({p.start: p for p in to_quarters(quarter_rows, native_minutes=15)})
+        for start, price, from_hour in quarter_rows:
+            q = floor_quarter(start)
+            points[q] = ForecastPoint(q, price, expanded=from_hour)
         # Alleen kwartieren die de bron zelf als voorspelling markeert (een uur kan
         # half day-ahead, half voorspelling zijn).
         return [points[k] for k in sorted(points) if k in forecast_starts]

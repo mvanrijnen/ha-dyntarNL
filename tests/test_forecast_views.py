@@ -130,3 +130,11 @@ def test_forecast_chart_only_forecast_and_needs_tariff():
     published_end = max(r.end for r in data.merged if r.source == "published")
     assert all(ms >= published_end.timestamp() * 1000 for ms, _ in allin)
     assert forecast_chart(data.merged, None) == ([], [], [])
+
+
+def test_service_configured_provider_without_data_is_not_an_error():
+    """Ingestelde bron zonder actuele reeks (backoff) → alleen gepubliceerd, geen fout."""
+    data, c = _forecast([0.10] * 8, [0.12] * 8)
+    data.providers.pop(B)  # bijv. in backoff of verouderd
+    out = service_response(prices_data(), data, c, "Essent", ELECTRICITY, True, B, None, NOW)
+    assert {r["source"] for r in out["records"]} == {"published"}

@@ -164,8 +164,10 @@ def service_response(
     elif provider == PROVIDER_ALL:
         records = merge(published, primary_series(forecast.ensemble, forecast.providers, cfg))
         extra["providers"] = forecast.providers
-    elif provider in forecast.providers:
-        records = merge(published, forecast.providers[provider])
+    elif provider in cfg.providers:
+        # Ingestelde bron zonder actuele reeks (nog niet opgehaald, backoff, verouderd):
+        # geen fout, gewoon alleen de gepubliceerde prijzen.
+        records = merge(published, forecast.providers.get(provider, []))
     else:
         raise ValueError(f"Onbekende of uitgeschakelde provider: {provider}")
 
