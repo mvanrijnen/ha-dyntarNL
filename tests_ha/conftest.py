@@ -18,3 +18,19 @@ import custom_components  # noqa: E402
 _ours = str(REPO / "custom_components")
 if _ours not in list(custom_components.__path__):
     custom_components.__path__.append(_ours)
+
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def no_ha_usage_warnings(caplog):
+    """Faal als HA meldt dat DynTarNL iets verouderds/verkeerds doet ('Detected that custom
+    integration ...'). Zulke meldingen worden later vaak fouten (bijv. HA 2026.12)."""
+    yield
+    bad = [
+        r.getMessage()
+        for r in caplog.records
+        if "custom integration 'dyntarnl'" in r.getMessage() or "integration 'dyntarnl'" in r.getMessage()
+    ]
+    assert not bad, bad

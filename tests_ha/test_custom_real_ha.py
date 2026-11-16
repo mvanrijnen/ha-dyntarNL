@@ -155,7 +155,7 @@ async def _reconfigure(hass, entry):
     )
 
 
-async def test_reconfigure_custom_to_essent_keeps_entities(hass, prices, aioclient_mock):
+async def test_reconfigure_custom_to_essent_keeps_entities(hass, prices, aioclient_mock, caplog):
     aioclient_mock.get(ESSENT, json=json.loads((FIX / "essent.json").read_text(encoding="utf-8")))
     entry = await _add_custom(hass)
     entity_id = "sensor.dyntarnl_e_all_in_now"
@@ -173,6 +173,8 @@ async def test_reconfigure_custom_to_essent_keeps_entities(hass, prices, aioclie
     assert entry.data == {"supplier": "essent"} and entry.title == "Essent"
     assert entry.options["forecast_enabled"] is False  # opties behouden
     assert len(hass.config_entries.async_entries(DOMAIN)) == 1  # geen tweede entry
+    # HA 2026.11 waarschuwt bij dubbel herladen (update-listener + reload); stopt in 2026.12.
+    assert "should use it for scheduling a reload" not in caplog.text
     assert er.async_get(hass).async_get(entity_id).unique_id == unique_before
     state = hass.states.get(entity_id)  # zelfde entity_id, nu met Essent-prijzen
     assert state is not None and state.state not in ("unknown", "unavailable")
@@ -182,7 +184,7 @@ async def test_reconfigure_custom_to_essent_keeps_entities(hass, prices, aioclie
     assert float(state.state) == pytest.approx(row["totalAmount"], abs=1e-5)
 
 
-async def test_reconfigure_custom_tariffs_are_prefilled_and_applied(hass, prices):
+async def test_reconfigure_custom_tariffs_are_prefilled_and_applied(hass, prices, caplog):
     entry = await _add_custom(hass)
     result = await _reconfigure(hass, entry)
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {"supplier": "custom"})
@@ -201,6 +203,7 @@ async def test_reconfigure_custom_tariffs_are_prefilled_and_applied(hass, prices
     expected = (float(row["price"]) + 0.03 + 0.09161) * 1.21
     assert float(hass.states.get("sensor.dyntarnl_e_all_in_now").state) == pytest.approx(expected, abs=1e-5)
     assert entry.data["markup_electricity"] == 0.03
+    assert "should use it for scheduling a reload" not in caplog.text
 
 
 async def test_leftover_ev_device_and_entities_are_cleaned_up(hass, prices):

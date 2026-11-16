@@ -164,10 +164,8 @@ class DynTarNLConfigFlow(ConfigFlow, domain=DOMAIN):
             supplier = supplier_by_key(self._supplier)
             if supplier and supplier.platform == PLATFORM_CUSTOM:
                 return await self.async_step_reconfigure_custom()
-            return self.async_update_reload_and_abort(
-                entry,
-                title=supplier.name if supplier else "DynTarNL",
-                data={CONF_SUPPLIER: self._supplier},
+            return self._update_and_abort(
+                entry, supplier.name if supplier else "DynTarNL", {CONF_SUPPLIER: self._supplier}
             )
 
         return self.async_show_form(
@@ -175,15 +173,22 @@ class DynTarNLConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=_supplier_schema(entry.data.get(CONF_SUPPLIER)),
         )
 
+    def _update_and_abort(self, entry: ConfigEntry, title: str, data: dict[str, Any]) -> ConfigFlowResult:
+        """Entry bijwerken; het herladen doet de update-listener uit __init__.py.
+
+        Niet async_update_reload_and_abort: die herlaadt zelf ook, en HA meldt dat dubbele
+        herladen (stopt met werken in HA 2026.12).
+        """
+        self.hass.config_entries.async_update_entry(entry, title=title, data=data)
+        return self.async_abort(reason="reconfigure_successful")
+
     async def async_step_reconfigure_custom(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         entry = self._get_reconfigure_entry()
         if user_input is not None:
-            return self.async_update_reload_and_abort(
-                entry,
-                title="Custom supplier",
-                data={CONF_SUPPLIER: self._supplier, **user_input},
+            return self._update_and_abort(
+                entry, "Custom supplier", {CONF_SUPPLIER: self._supplier, **user_input}
             )
         # Was het al CUSTOM, dan de huidige tarieven voorinvullen.
         return self.async_show_form(
