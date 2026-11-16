@@ -186,7 +186,7 @@ class DynTarNLConfigFlow(ConfigFlow, domain=DOMAIN):
         herladen (stopt met werken in HA 2026.12).
         """
         self.hass.config_entries.async_update_entry(entry, title=title, data=data)
-        if entry.state is ConfigEntryState.SETUP_RETRY:
+        if entry.state in (ConfigEntryState.SETUP_RETRY, ConfigEntryState.SETUP_ERROR):
             # Opzetten mislukte (bijv. bron onbereikbaar): dan is er geen update-listener;
             # meteen opnieuw proberen met de nieuwe leverancier i.p.v. HA's backoff af te wachten.
             self.hass.config_entries.async_schedule_reload(entry.entry_id)

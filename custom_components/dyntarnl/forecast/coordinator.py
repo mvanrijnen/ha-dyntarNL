@@ -88,6 +88,8 @@ class DynTarNLForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
         self._session = async_get_clientsession(hass)
         self._store = Store(hass, STORAGE_VERSION, storage_key(entry.entry_id))
         self._tick_lock = asyncio.Lock()
+        self._force_pending = False  # Ververs tijdens een lopende ronde: daarna alsnog
+        self._closed = False  # na unload: niets meer ophalen of opslaan
         # Opgeslagen statistiek bewaren als de meting (tijdelijk) uit staat, zodat
         # 'nauwkeurigheid uit' de opgebouwde historie niet weggooit.
         self._stored_accuracy: dict | None = None
@@ -104,16 +106,24 @@ class DynTarNLForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
 
     async def async_tick(self, force: bool = False) -> None:
         """Haal op bij providers die aan de beurt zijn. Faalt nooit naar buiten."""
+        if self._closed:
+            return
         if self._tick_lock.locked():
-            return  # er loopt al een ronde (bijv. opstart + eerste kwartier-tik)
+            # Er loopt al een ronde (bijv. opstart + eerste kwartier-tik). Een geforceerde
+            # (Ververs-knop) niet stil laten vallen, maar direct na die ronde uitvoeren.
+            self._force_pending = self._force_pending or force
+            return
         async with self._tick_lock:
-            now = dt_util.utcnow()
-            due = [k for k in self.providers if force or self.is_due(k, now)]
-            if not due:
-                return
-            results = await asyncio.gather(*(self._fetch_one(k, now) for k in due))
-            fetched = [k for k, ok in zip(due, results) if ok]
-            self.rebuild(snapshot=fetched)
+            while not self._closed:
+                now = dt_util.utcnow()
+                due = [k for k in self.providers if force or self.is_due(k, now)]
+                if due:
+                    results = await asyncio.gather(*(self._fetch_one(k, now) for k in due))
+                    fetched = [k for k, ok in zip(due, results) if ok]
+                    self.rebuild(snapshot=fetched)
+                if not self._force_pending:
+                    break
+                self._force_pending, force = False, True
 
     async def _fetch_one(self, key: str, now: datetime) -> bool:
         status = self.status[key]
@@ -154,6 +164,8 @@ class DynTarNLForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
 
     @callback
     def rebuild(self, snapshot: list[str] | tuple[str, ...] = ()) -> None:
+        if self._closed:
+            return  # na unload niet meer opslaan (zou de nieuwe/verwijderde opslag overschrijven)
         try:
             now = dt_util.utcnow()
             prices = self.prices.data or {}
@@ -244,6 +256,7 @@ class DynTarNLForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
         """Bij unload: nu opslaan. Anders schrijft een nog lopende vertraagde save (tot 60 s)
         na het verwijderen het opslagbestand terug, of overschrijft hij na een reload de
         nieuwere data."""
+        self._closed = True
         await self._store.async_save(self._data_to_save())
 
     async def async_start(self) -> None:

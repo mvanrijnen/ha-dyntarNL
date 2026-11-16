@@ -293,3 +293,37 @@ def test_provider_info_survives_restart():
     restarted, _ = _make(entry_id="info")
     asyncio.run(restarted.async_load())
     assert restarted.providers[B].info == {"plan": "private_pro", "allowed_horizon_hours": 120}
+
+
+def test_forced_refresh_during_running_tick_is_not_lost():
+    """Ververs-knop tijdens een lopende ronde: daarna alsnog geforceerd ophalen."""
+    fc, _ = _make()
+    calls = []
+
+    async def slow():
+        await asyncio.sleep(0.05)
+        return _points(0.1)
+
+    _stub(fc, A, slow, calls)
+    _stub(fc, B, slow, calls)
+
+    async def scenario():
+        first = asyncio.ensure_future(fc.async_tick())
+        await asyncio.sleep(0.01)
+        await fc.async_tick(force=True)  # ronde loopt al
+        await first
+
+    asyncio.run(scenario())
+    assert sorted(calls) == sorted([A, B, A, B])  # tweede (geforceerde) ronde na de eerste
+
+
+def test_nothing_is_saved_after_unload():
+    import sys
+
+    store = sys.modules["homeassistant.helpers.storage"].Store
+    fc, _ = _make(entry_id="closed")
+    asyncio.run(fc.async_flush())
+    store.data.pop("dyntarnl.forecast_closed", None)
+    fc.rebuild()
+    asyncio.run(fc.async_tick(force=True))
+    assert "dyntarnl.forecast_closed" not in store.data

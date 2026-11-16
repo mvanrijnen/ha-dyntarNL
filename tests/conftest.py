@@ -70,7 +70,7 @@ def _install_ha_stubs() -> None:
     _mod("homeassistant")
     ce = _mod("homeassistant.config_entries")
     ce.ConfigEntry = object
-    ce.ConfigEntryState = type("ConfigEntryState", (), {"LOADED": "loaded", "SETUP_RETRY": "setup_retry"})
+    ce.ConfigEntryState = type("ConfigEntryState", (), {"LOADED": "loaded", "SETUP_RETRY": "setup_retry", "SETUP_ERROR": "setup_error"})
     ce.ConfigFlowResult = dict
 
     class _FlowBase:

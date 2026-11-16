@@ -64,3 +64,42 @@ def test_next_hour_over_spring_gap(real_tz):
     now = datetime(2026, 3, 29, 1, 30, tzinfo=AMS)
     nxt = slot_at(slots, now.astimezone(UTC) + timedelta(hours=1))
     assert nxt.start.astimezone(AMS).hour == 3
+
+
+def test_naive_slots_never_overlap_on_dst_days(real_tz):
+    """Eindlabels los omzetten gaf rond de klokwissel overlappende slots."""
+    from dyntarnl.model import localize_naive_slots
+
+    # Maart, bron met correcte starts en 'start + 1u' als eind (dus eind '02:00').
+    starts = ["2026-03-29T00:00:00", "2026-03-29T01:00:00", "2026-03-29T03:00:00", "2026-03-29T04:00:00"]
+    ends = ["2026-03-29T01:00:00", "2026-03-29T02:00:00", "2026-03-29T04:00:00", "2026-03-29T05:00:00"]
+    spans = localize_naive_slots(starts, ends)
+    for (s1, e1), (s2, _) in zip(spans, spans[1:]):
+        assert e1.timestamp() <= s2.timestamp()
+    # Oktober, dubbel '02:00' met eindlabels 03:00 twee keer.
+    starts = ["2026-10-25T01:00:00", "2026-10-25T02:00:00", "2026-10-25T02:00:00", "2026-10-25T03:00:00"]
+    ends = ["2026-10-25T02:00:00", "2026-10-25T03:00:00", "2026-10-25T03:00:00", "2026-10-25T04:00:00"]
+    spans = localize_naive_slots(starts, ends)
+    assert [round((e - s).total_seconds() / 3600) for s, e in ((x.astimezone(UTC), y.astimezone(UTC)) for x, y in spans)] == [1, 1, 1, 1]
+    for (s1, e1), (s2, _) in zip(spans, spans[1:]):
+        assert e1.timestamp() <= s2.timestamp()
+
+
+def test_energyzero_fall_back_hour_has_its_own_price(real_tz, monkeypatch):
+    import asyncio
+
+    import dyntarnl.sources as src
+
+    rows = [{"readingDate": f"2026-10-25T{h:02d}:00:00Z", "price": 0.1 + h / 100} for h in range(0, 4)]
+
+    async def fake_get(session, url, **kw):
+        return {"Prices": rows}
+
+    monkeypatch.setattr(src, "_get_json", fake_get)
+    monkeypatch.setattr(sys.modules["homeassistant.util.dt"], "now", lambda: datetime(2026, 10, 25, 12, tzinfo=AMS))
+    monkeypatch.setattr(sys.modules["homeassistant.util.dt"], "start_of_local_day", lambda d: datetime(d.year, d.month, d.day, tzinfo=AMS))
+    data = asyncio.run(src.fetch_energyzero(None))
+    slots = data["electricity"].today
+    # 02:30 CET (01:30Z) hoort bij het 01Z-uur, niet bij het CEST-uur ervoor.
+    found = slot_at(slots, datetime(2026, 10, 25, 1, 30, tzinfo=UTC))
+    assert found.market_ex == pytest.approx(0.11)

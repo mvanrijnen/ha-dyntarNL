@@ -31,7 +31,7 @@ from .const import (
     GROUP_MARKET,
     GROUP_TAX,
 )
-from .model import EnergyData, PriceData, Slot, bucket_by_day, localize_naive_series, parse_dt
+from .model import EnergyData, PriceData, Slot, bucket_by_day, localize_naive_series, localize_naive_slots, parse_dt
 from .prices import Tariff, apply_formula
 
 _TIMEOUT = aiohttp.ClientTimeout(total=30)
@@ -106,9 +106,10 @@ async def fetch_eon_app(session: aiohttp.ClientSession, host: str) -> PriceData:
                 float(block.get("vatPercentage") if block.get("vatPercentage") is not None else 21),
             )
             tariffs = block["tariffs"]
-            starts = localize_naive_series([t["startDateTime"] for t in tariffs])
-            ends = localize_naive_series([t["endDateTime"] for t in tariffs])
-            for t, start, end in zip(tariffs, starts, ends):
+            spans = localize_naive_slots(
+                [t["startDateTime"] for t in tariffs], [t["endDateTime"] for t in tariffs]
+            )
+            for t, (start, end) in zip(tariffs, spans):
                 g = t.get("groups", [])
                 per_energy[energy].append(
                     Slot(
@@ -160,10 +161,11 @@ async def fetch_easyenergy(session: aiohttp.ClientSession) -> PriceData:
     # Gas per uur: 'day' geeft kalenderdaggemiddelden (00–00) i.p.v. de gasdag (06–06).
     for energy, unit, gran in ((ELECTRICITY, "kWh", "hour"), (GAS, "m³", "hour")):
         rows = await _easyenergy_rows(session, energy, gran)
-        starts = localize_naive_series([_clean_ts(r["from"]) for r in rows])
-        ends = localize_naive_series([_clean_ts(r["until"]) for r in rows])
+        spans = localize_naive_slots(
+            [_clean_ts(r["from"]) for r in rows], [_clean_ts(r["until"]) for r in rows]
+        )
         slots: list[Slot] = []
-        for r, start, end in zip(rows, starts, ends):
+        for r, (start, end) in zip(rows, spans):
             market_ex = _num(r.get("price"), "easyEnergy price")
             market = (
                 _num(r["priceIncVat"], "easyEnergy priceIncVat")
@@ -377,7 +379,8 @@ async def fetch_energyzero(session: aiohttp.ClientSession) -> PriceData:
             slots.append(
                 Slot(
                     start=start,
-                    end=start + timedelta(hours=1),
+                    # Eén echt uur later (niet op de wandklok: dubbel uur in oktober).
+                    end=dt_util.as_local(dt_util.as_utc(start) + timedelta(hours=1)),
                     total=total,
                     market=market,
                     market_ex=market_ex,

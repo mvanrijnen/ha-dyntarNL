@@ -56,6 +56,27 @@ def tomorrow_complete(data: PriceData | None) -> bool:
     )
 
 
+def localize_naive_slots(starts: list[str], ends: list[str]) -> list[tuple[datetime, datetime]]:
+    """Begin/eind-paren uit naïeve lokale tijden → echte lokale tijden.
+
+    Het eind wordt afgeleid van het begin plus de (naïeve) duur, in echte tijd. Eindlabels
+    los omzetten gaf rond de klokwissel overlappende slots (bijv. een eind '02:00' dat in
+    maart niet bestaat, of een dubbel '03:00' in oktober).
+    """
+    out = []
+    for start, s_raw, e_raw in zip(localize_naive_series(starts), starts, ends):
+        naive_start = dt_util.parse_datetime(s_raw)
+        naive_end = dt_util.parse_datetime(e_raw)
+        if naive_start is None or naive_end is None:
+            raise ValueError(f"Ongeldige datum/tijd: {s_raw} / {e_raw}")
+        if naive_end.tzinfo is not None:
+            end = dt_util.as_local(naive_end)
+        else:
+            end = dt_util.as_local(dt_util.as_utc(start) + (naive_end - naive_start.replace(tzinfo=None)))
+        out.append((start, end))
+    return out
+
+
 def localize_naive_series(values: list[str]) -> list[datetime]:
     """Opeenvolgende naïeve lokale tijden (eon-app, easyEnergy) → echte lokale tijden.
 
