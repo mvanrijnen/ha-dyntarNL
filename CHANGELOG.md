@@ -5,6 +5,12 @@ oudere versies staan op de [releases-pagina](https://github.com/mvanrijnen/ha-dy
 
 ## 1.1.0
 
+> **Dit is de versie die eerder als "2.0" werd aangekondigd**
+> ([#2](https://github.com/mvanrijnen/ha-dyntarNL/issues/2)). Omdat er voor bestaande
+> gebruikers niets breekt (geen gewijzigde entiteiten of instellingen, alles nieuws staat
+> standaard uit), is het volgens [semver](https://semver.org/lang/nl/) een minor-release:
+> **1.1.0** in plaats van 2.0.0.
+
 ### In het kort
 
 - **Nieuw: prijsvoorspellingen tot 7 dagen vooruit (optioneel).** Uit twee externe bronnen,
