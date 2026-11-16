@@ -167,6 +167,8 @@ def test_restart_restores_series_without_refetch(at_time):
     assert calls2 == []  # nog vers: geen extra calls na herstart
     assert set(restarted.series) == {A, B}
     assert len(restarted.series[A].points) == 96
+    assert restarted.status[A].last_success == NOW  # last_fetch-sensor niet leeg na herstart
+    assert restarted.status[A].state == "ok"
     assert len(restarted.tracker.snapshots) == len(fc.tracker.snapshots)
 
 

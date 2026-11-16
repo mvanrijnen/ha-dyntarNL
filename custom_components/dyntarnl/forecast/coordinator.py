@@ -201,7 +201,11 @@ class DynTarNLForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
                 for i, (v, e) in enumerate(zip(s["v"], s["e"]))
                 if v is not None
             ]
-            self.series[key] = ProviderSeries(key, dt_util.as_utc(dt_util.parse_datetime(s["f"])), points)
+            fetched_at = dt_util.as_utc(dt_util.parse_datetime(s["f"]))
+            self.series[key] = ProviderSeries(key, fetched_at, points)
+            # Anders blijft de last_fetch-sensor na een herstart leeg tot de volgende
+            # fetch (tot 6 uur later), terwijl de reeks gewoon vers is.
+            self.status[key].last_success = fetched_at
         if self.tracker is not None:
             self.tracker.load(stored.get("accuracy"))
         self.rebuild()
