@@ -201,3 +201,27 @@ async def test_reconfigure_custom_tariffs_are_prefilled_and_applied(hass, prices
     expected = (float(row["price"]) + 0.03 + 0.09161) * 1.21
     assert float(hass.states.get("sensor.dyntarnl_e_all_in_now").state) == pytest.approx(expected, abs=1e-5)
     assert entry.data["markup_electricity"] == 0.03
+
+
+async def test_leftover_ev_device_and_entities_are_cleaned_up(hass, prices):
+    """Zoals bij een installatie die eerder de laadkosten-testversie draaide."""
+    from homeassistant.helpers import device_registry as dr, entity_registry as er
+
+    entry = await _add_custom(hass)
+    dev = dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id, identifiers={(DOMAIN, f"{entry.entry_id}_ev")}, name="DynTarNL EV"
+    )
+    ent = er.async_get(hass).async_get_or_create(
+        "sensor", DOMAIN, f"{entry.entry_id}_ev_cost_total", config_entry=entry, device_id=dev.id
+    )
+
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert dr.async_get(hass).async_get(dev.id) is None
+    assert er.async_get(hass).async_get(ent.entity_id) is None
+    # De echte devices en sensoren blijven.
+    left = dr.async_entries_for_config_entry(dr.async_get(hass), entry.entry_id)
+    idents = {i for d in left for _, i in d.identifiers}
+    assert f"{entry.entry_id}_electricity" in idents and f"{entry.entry_id}_ev" not in idents
+    assert hass.states.get("sensor.dyntarnl_e_all_in_now").state not in ("unknown", "unavailable")

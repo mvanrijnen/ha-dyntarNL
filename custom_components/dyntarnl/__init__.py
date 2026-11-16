@@ -122,11 +122,25 @@ async def async_migrate_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -
     return True
 
 
+def _expected_devices(entry_id: str, cfg: ForecastConfig) -> set[str]:
+    """Device-identifiers die DynTarNL bij deze opties zelf aanmaakt."""
+    expected = {f"{entry_id}_electricity", f"{entry_id}_gas", f"{entry_id}_service"}
+    if cfg.enabled:
+        expected.add(f"{entry_id}_forecast")
+    return expected
+
+
 def _cleanup_forecast_entities(
     hass: HomeAssistant, entry: DynTarNLConfigEntry, cfg: ForecastConfig
 ) -> None:
-    """Ruim voorspel-entiteiten op die bij de huidige opties niet meer horen
-    (optie uit, of een provider uitgezet); anders blijven er 'unavailable'-wezen."""
+    """Ruim op wat bij de huidige opties niet meer hoort; anders blijven er
+    'unavailable'-wezen staan.
+
+    - voorspel-entiteiten van een uitgezette optie of provider;
+    - eigen devices die DynTarNL niet (meer) aanmaakt, bijv. het Forecast-device met de
+      optie uit, of restanten van een testversie (zoals 'DynTarNL EV'). HA verwijdert de
+      entiteiten van zo'n device automatisch mee.
+    """
     from homeassistant.helpers import device_registry as dr, entity_registry as er
 
     registry = er.async_get(hass)
@@ -134,10 +148,14 @@ def _cleanup_forecast_entities(
     for ent in er.async_entries_for_config_entry(registry, entry.entry_id):
         if is_forecast_unique_id(entry.entry_id, ent.unique_id) and ent.unique_id not in keep:
             registry.async_remove(ent.entity_id)
-    if not cfg.enabled:
-        devices = dr.async_get(hass)
-        device = devices.async_get_device(identifiers={(DOMAIN, f"{entry.entry_id}_forecast")})
-        if device is not None:
+
+    devices = dr.async_get(hass)
+    expected = _expected_devices(entry.entry_id, cfg)
+    for device in dr.async_entries_for_config_entry(devices, entry.entry_id):
+        ours = {ident for domain, ident in device.identifiers if domain == DOMAIN}
+        if ours and not ours & expected:
+            for ent in er.async_entries_for_device(registry, device.id, include_disabled_entities=True):
+                registry.async_remove(ent.entity_id)
             devices.async_remove_device(device.id)
 
 

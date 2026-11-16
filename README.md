@@ -2,7 +2,7 @@
   <img src="brand/logo.svg" alt="DynTarNL" width="380">
 </p>
 
-# DynTarNL — Dynamische stroom- & gastarieven (NL)
+# DynTarNL — Dynamische stroom- & gastarieven (NL), optioneel met prijsvoorspellingen
 
 [![Tests](https://github.com/mvanrijnen/ha-dyntarNL/actions/workflows/test.yml/badge.svg)](https://github.com/mvanrijnen/ha-dyntarNL/actions/workflows/test.yml)
 [![Validate](https://github.com/mvanrijnen/ha-dyntarNL/actions/workflows/validate.yml/badge.svg)](https://github.com/mvanrijnen/ha-dyntarNL/actions/workflows/validate.yml)
@@ -13,6 +13,10 @@ Home Assistant integratie die de **dynamische energietarieven van meerdere Neder
 leveranciers** als sensoren publiceert. Je kiest je leverancier; de integratie bepaalt zelf
 welk platform en welke publieke prijs-API erbij hoort. **Geen account of API-sleutel nodig**
 voor de ondersteunde leveranciers.
+
+**Optioneel:** [prijsvoorspellingen tot 7 dagen vooruit](#prijsvoorspellingen-optioneel), omgerekend
+met de tarieven van jouw leverancier. Handig om laden, de thuisaccu of de wasmachine verder
+vooruit te plannen dan de day-ahead prijzen reiken. Standaard uit.
 
 > ## Stabiel — klaar voor dagelijks gebruik
 >

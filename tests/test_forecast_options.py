@@ -259,3 +259,16 @@ def test_all_option_forms_build():
     flow = _flow()
     for step in (flow.async_step_init, flow.async_step_forecast, flow.async_step_advanced):
         assert asyncio.run(step())["type"] == "form"
+
+
+def test_leftover_devices_are_removed_own_devices_kept(setup_env):
+    """Restanten (bijv. 'DynTarNL EV' van een testversie) gaan weg; eigen devices blijven."""
+    run, _, _ = setup_env
+    devices = {
+        (DOMAIN, "entry1_electricity"): "dev-e",
+        (DOMAIN, "entry1_gas"): "dev-g",
+        (DOMAIN, "entry1_service"): "dev-s",
+        (DOMAIN, "entry1_ev"): "dev-ev",
+    }
+    hass, _, _ = run({**FORECAST_DEFAULTS, CONF_FORECAST: True}, devices=devices)
+    assert hass.device_registry.removed == ["dev-ev"]

@@ -1,4 +1,4 @@
-# DynTarNL — Dynamische stroom- & gastarieven (NL)
+# DynTarNL — Dynamische stroom- & gastarieven (NL), optioneel met prijsvoorspellingen
 
 Publiceert dynamische energietarieven van meerdere Nederlandse leveranciers als sensoren.
 Je kiest je leverancier; de integratie bepaalt zelf het platform en de publieke prijs-API.

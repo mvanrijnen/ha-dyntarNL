@@ -27,8 +27,9 @@ class EntityRegistry:
 
 
 class DeviceRegistry:
-    def __init__(self, devices=None):
+    def __init__(self, devices=None, entry_id="entry1"):
         self.devices = dict(devices or {})  # identifier -> id
+        self.entry_id = entry_id
         self.removed = []
 
     def async_get_device(self, identifiers):
@@ -36,6 +37,11 @@ class DeviceRegistry:
             if ident in self.devices:
                 return SimpleNamespace(id=self.devices[ident])
         return None
+
+    def entries(self, entry_id):
+        if entry_id != self.entry_id:
+            return []
+        return [SimpleNamespace(id=dev_id, identifiers={ident}) for ident, dev_id in self.devices.items()]
 
     def async_remove_device(self, device_id):
         self.removed.append(device_id)

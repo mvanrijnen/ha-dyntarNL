@@ -207,11 +207,15 @@ def _install_ha_stubs() -> None:
     dr.DeviceEntryType = type("DeviceEntryType", (), {"SERVICE": "service"})
     dr.DeviceInfo = lambda **k: k
     dr.async_get = lambda hass: hass.device_registry
+    dr.async_entries_for_config_entry = lambda reg, entry_id: reg.entries(entry_id)
     helpers.device_registry = dr
     er = _mod("homeassistant.helpers.entity_registry")
     er.async_get = lambda hass: hass.entity_registry
     er.async_entries_for_config_entry = lambda reg, entry_id: [
         e for e in reg.entries if e.config_entry_id == entry_id
+    ]
+    er.async_entries_for_device = lambda reg, device_id, include_disabled_entities=False: [
+        e for e in reg.entries if getattr(e, "device_id", None) == device_id
     ]
     helpers.entity_registry = er
     _mod("homeassistant.helpers.entity_platform").AddEntitiesCallback = object
