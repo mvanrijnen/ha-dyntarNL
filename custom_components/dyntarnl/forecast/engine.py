@@ -145,8 +145,15 @@ def build(
         if (s := series.get(key)) is not None and s.fetched_at >= max_age
     ]
 
+    stat_cache: dict[tuple[str, str | None], Stat | None] = {}
+
     def stat_fn(provider: str, bucket: str | None) -> Stat | None:
-        return tracker.provider_stat(provider, bucket) if tracker else None
+        if tracker is None:
+            return None
+        key = (provider, bucket)
+        if key not in stat_cache:
+            stat_cache[key] = tracker.provider_stat(provider, bucket)
+        return stat_cache[key]
 
     # Afzonderlijke providerreeksen.
     provider_records: dict[str, list[QuarterRecord]] = {}

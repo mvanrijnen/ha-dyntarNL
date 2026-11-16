@@ -6,7 +6,13 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigEntryState,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
@@ -180,6 +186,10 @@ class DynTarNLConfigFlow(ConfigFlow, domain=DOMAIN):
         herladen (stopt met werken in HA 2026.12).
         """
         self.hass.config_entries.async_update_entry(entry, title=title, data=data)
+        if entry.state is ConfigEntryState.SETUP_RETRY:
+            # Opzetten mislukte (bijv. bron onbereikbaar): dan is er geen update-listener;
+            # meteen opnieuw proberen met de nieuwe leverancier i.p.v. HA's backoff af te wachten.
+            self.hass.config_entries.async_schedule_reload(entry.entry_id)
         return self.async_abort(reason="reconfigure_successful")
 
     async def async_step_reconfigure_custom(
@@ -247,7 +257,11 @@ class DynTarNLOptionsFlow(OptionsFlow):
         if user_input is not None:
             if not user_input.get(CONF_FC_PROVIDERS):
                 errors[CONF_FC_PROVIDERS] = "no_providers"
-            elif user_input[CONF_FC_WEIGHTING] == WEIGHTING_ACCURACY and not user_input[CONF_FC_ACCURACY]:
+            elif (
+                user_input[CONF_FC_ENSEMBLE]  # weging speelt alleen bij het ensemble
+                and user_input[CONF_FC_WEIGHTING] == WEIGHTING_ACCURACY
+                and not user_input[CONF_FC_ACCURACY]
+            ):
                 errors[CONF_FC_WEIGHTING] = "weighting_needs_accuracy"
             else:
                 for key in (CONF_FC_WEIGHT_EXPONENT, CONF_FC_HORIZON, CONF_FC_INTERVAL):
@@ -258,7 +272,9 @@ class DynTarNLOptionsFlow(OptionsFlow):
         current = {**self._current(), **(user_input or {})}
         schema = vol.Schema(
             {
-                vol.Required(CONF_FC_PROVIDERS, default=list(current[CONF_FC_PROVIDERS])): _select(
+                vol.Required(
+                    CONF_FC_PROVIDERS, default=[k for k in current[CONF_FC_PROVIDERS] if k in PROVIDERS]
+                ): _select(
                     list(PROVIDERS), "forecast_provider", multiple=True
                 ),
                 vol.Required(CONF_FC_ENSEMBLE, default=current[CONF_FC_ENSEMBLE]): BooleanSelector(),
@@ -302,8 +318,14 @@ class DynTarNLOptionsFlow(OptionsFlow):
         errors: dict[str, str] = {}
         if user_input is not None:
             session = async_get_clientsession(self.hass)
+            stored = self._current()
             for provider in providers:
-                if provider.option_keys and (error := await provider.async_validate(session)):
+                # Alleen een testcall als je de instellingen van deze bron wijzigt (en niet
+                # voor een lege API-key): anders kun je niets opslaan zolang een bron even
+                # onbereikbaar is, en duurt opslaan tot 20 s per bron.
+                changed = any(submitted.get(k) != stored.get(k) for k in provider.option_keys)
+                filled = any(submitted.get(k) for k in provider.option_keys)
+                if changed and filled and (error := await provider.async_validate(session)):
                     errors[provider.option_keys[0]] = error
             if not errors:
                 self._options.update(submitted)

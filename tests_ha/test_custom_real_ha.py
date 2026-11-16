@@ -228,3 +228,46 @@ async def test_leftover_ev_device_and_entities_are_cleaned_up(hass, prices):
     idents = {i for d in left for _, i in d.identifiers}
     assert f"{entry.entry_id}_electricity" in idents and f"{entry.entry_id}_ev" not in idents
     assert hass.states.get("sensor.dyntarnl_e_all_in_now").state not in ("unknown", "unavailable")
+
+
+async def test_removing_with_forecast_leaves_no_storage_behind(hass, prices, hass_storage, freezer):
+    """Een vertraagde save mocht na het verwijderen het opslagbestand terugschrijven."""
+    from datetime import timedelta
+
+    from pytest_homeassistant_custom_component.common import async_fire_time_changed
+
+    entry = await _add_custom(hass)
+    hass.config_entries.async_update_entry(entry, options={**entry.options, "forecast_enabled": True})
+    await hass.async_block_till_done()  # update-listener herlaadt met voorspellingen aan
+    key = f"{DOMAIN}.forecast_{entry.entry_id}"
+
+    await hass.config_entries.async_remove(entry.entry_id)
+    await hass.async_block_till_done()
+    freezer.tick(timedelta(seconds=120))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert key not in hass_storage
+
+
+async def test_reconfigure_while_supplier_is_down_reloads_immediately(hass, aioclient_mock, freezer):
+    """Bron onbereikbaar → SETUP_RETRY. Overstappen moet direct herladen (geen listener)."""
+    await hass.config.async_set_time_zone("Europe/Amsterdam")
+    freezer.move_to("2026-08-17T12:00:00+00:00")
+    aioclient_mock.get(f"{EASY}?type=electricity", status=500)
+    aioclient_mock.get(f"{EASY}?type=gas", status=500)
+    aioclient_mock.get(ESSENT, json=json.loads((FIX / "essent.json").read_text(encoding="utf-8")))
+
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"supplier": "custom"})
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], CUSTOM_INPUT)
+    await hass.async_block_till_done()
+    entry = result["result"]
+    assert entry.state is ConfigEntryState.SETUP_RETRY
+    # Services bestaan ook als het opzetten mislukt.
+    assert hass.services.has_service(DOMAIN, "get_prices") and hass.services.has_service(DOMAIN, "refresh")
+
+    result = await _reconfigure(hass, entry)
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"supplier": "essent"})
+    await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.LOADED
+    assert hass.states.get("sensor.dyntarnl_e_all_in_now").state not in ("unknown", "unavailable")

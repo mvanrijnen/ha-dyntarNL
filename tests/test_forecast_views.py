@@ -138,3 +138,13 @@ def test_service_configured_provider_without_data_is_not_an_error():
     data.providers.pop(B)  # bijv. in backoff of verouderd
     out = service_response(prices_data(), data, c, "Essent", ELECTRICITY, True, B, None, NOW)
     assert {r["source"] for r in out["records"]} == {"published"}
+
+
+def test_service_while_forecast_is_starting_up():
+    """Voorspellingen aan, maar nog geen berekende reeks: wél 'enabled', alleen gepubliceerd."""
+    c = cfg()
+    out = service_response(prices_data(), None, c, "Essent", ELECTRICITY, True, "ensemble", None, NOW)
+    assert out["forecast_enabled"] is True
+    assert {r["source"] for r in out["records"]} == {"published"}
+    with pytest.raises(ValueError):
+        service_response(prices_data(), None, c, "Essent", ELECTRICITY, True, "nope", None, NOW)

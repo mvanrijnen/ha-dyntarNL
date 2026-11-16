@@ -1,7 +1,7 @@
 """Forecast-coordinator: isolatie, time-outs, backoff, schema en opslag."""
 
 import asyncio
-from datetime import timedelta
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -207,3 +207,77 @@ def test_all_forecast_sensor_functions_compute(monkeypatch):
     chart = next(e for e in entities if e.entity_description.chart)
     assert "prices" in chart._unrecorded_attributes
     assert chart.extra_state_attributes["prices"][0][2] in ("p", "f")
+
+
+# --- bughunt ronde 3 ------------------------------------------------------------
+
+
+def test_snapshots_skip_quarters_that_are_already_published():
+    """Een al gepubliceerd kwartier is geen voorspelling meer en mag de MAE niet vervuilen."""
+    fc, prices = _make()
+    prices.data = prices_data(tomorrow=[0.10] * 24)  # morgen staat al gepubliceerd
+    _stub(fc, A, _points(0.12, hours=48), [])  # voorspelt morgen + overmorgen
+    _stub(fc, B, _points(0.08, hours=48), [])
+    asyncio.run(fc.async_tick())
+    published_end = TOMORROW + timedelta(days=1)
+    for snap in fc.tracker.snapshots:
+        assert datetime.fromisoformat(snap["s"]) >= published_end, snap["p"]
+
+
+def test_accuracy_history_survives_turning_accuracy_off(monkeypatch):
+    fc, prices = _make(entry_id="acc")
+    _stub(fc, A, _points(0.12), [])
+    _stub(fc, B, _points(0.08), [])
+    asyncio.run(fc.async_tick())
+    prices.data = prices_data(tomorrow=[0.10] * 24)
+    fc.handle_prices_update()
+    before = fc.tracker.to_dict()["total"]
+    assert before
+
+    off, _ = _make(entry_id="acc", forecast_accuracy=False, forecast_weighting="equal")
+    asyncio.run(off.async_load())
+    asyncio.run(off.async_flush())
+    on, _ = _make(entry_id="acc")
+    asyncio.run(on.async_load())
+    assert on.tracker.to_dict()["total"] == before
+
+
+def test_unreadable_stored_series_is_skipped():
+    import sys
+
+    store = sys.modules["homeassistant.helpers.storage"].Store
+    store.data["dyntarnl.forecast_broken"] = {"series": {A: {"f": None, "s": "nonsense", "v": [0.1], "e": [0]}}}
+    fc, _ = _make(entry_id="broken")
+    asyncio.run(fc.async_load())  # mag niet crashen
+    assert A not in fc.series
+
+
+def test_concurrent_ticks_fetch_once():
+    fc, _ = _make()
+    calls = []
+
+    async def slow():
+        await asyncio.sleep(0.05)
+        return _points(0.1)
+
+    _stub(fc, A, slow, calls)
+    _stub(fc, B, slow, calls)
+
+    async def both():
+        await asyncio.gather(fc.async_tick(), fc.async_tick())
+
+    asyncio.run(both())
+    assert sorted(calls) == sorted([A, B])  # niet twee keer
+
+
+def test_flush_writes_pending_state_now():
+    import sys
+
+    store = sys.modules["homeassistant.helpers.storage"].Store
+    fc, _ = _make(entry_id="flush")
+    _stub(fc, A, _points(0.1), [])
+    _stub(fc, B, _points(0.2), [])
+    asyncio.run(fc.async_tick())
+    store.data.pop("dyntarnl.forecast_flush", None)
+    asyncio.run(fc.async_flush())
+    assert set(store.data["dyntarnl.forecast_flush"]["series"]) == {A, B}

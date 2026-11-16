@@ -41,6 +41,16 @@ def _spread(entry_id: str, span: int) -> int:
     return int(hashlib.sha256(entry_id.encode()).hexdigest(), 16) % span
 
 
+# Alleen via de UI in te stellen; services worden bij het laden van de integratie
+# geregistreerd, zodat ze ook bestaan als het opzetten (nog) mislukt.
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    _register_services(hass)
+    return True
+
+
 SERVICE_REFRESH = "refresh"
 SERVICE_GET_PRICES = "get_prices"
 
@@ -180,6 +190,7 @@ def _setup_forecast(
         async_track_time_change(hass, _tick, minute=[offset + 15 * i for i in range(4)], second=40)
     )
     entry.async_create_background_task(hass, fc.async_start(), "dyntarnl_forecast_start")
+    entry.async_on_unload(fc.async_flush)
 
 
 async def _async_options_updated(hass: HomeAssistant, entry: DynTarNLConfigEntry) -> None:
@@ -255,11 +266,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -> 
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -> bool:
-    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    if unloaded and not hass.config_entries.async_loaded_entries(DOMAIN):
-        hass.services.async_remove(DOMAIN, SERVICE_REFRESH)
-        hass.services.async_remove(DOMAIN, SERVICE_GET_PRICES)
-    return unloaded
+    # Services blijven geregistreerd (zie async_setup); zonder geladen entry geven ze een
+    # nette foutmelding.
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -> None:

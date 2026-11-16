@@ -70,6 +70,7 @@ def _install_ha_stubs() -> None:
     _mod("homeassistant")
     ce = _mod("homeassistant.config_entries")
     ce.ConfigEntry = object
+    ce.ConfigEntryState = type("ConfigEntryState", (), {"LOADED": "loaded", "SETUP_RETRY": "setup_retry"})
     ce.ConfigFlowResult = dict
 
     class _FlowBase:
@@ -113,6 +114,7 @@ def _install_ha_stubs() -> None:
 
     cv = _mod("homeassistant.helpers.config_validation")
     cv.boolean = bool
+    cv.config_entry_only_config_schema = lambda domain: None
     cv.string = str
     helpers.config_validation = cv
 

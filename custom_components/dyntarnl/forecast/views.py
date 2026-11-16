@@ -154,20 +154,26 @@ def service_response(
     gepubliceerde prijzen; voor gas op de eigen resolutie (gasdag)."""
     ed = (prices or {}).get(energy)
     published = published_records(ed, supplier, quarters=energy == ELECTRICITY)
-    use_forecast = include_forecast and forecast is not None and cfg is not None and energy == ELECTRICITY
+    enabled = cfg is not None and cfg.enabled
+    if enabled and provider not in (ENSEMBLE, PROVIDER_ALL) and provider not in cfg.providers:
+        raise ValueError(f"Onbekende of uitgeschakelde provider: {provider}")
+    use_forecast = include_forecast and enabled and energy == ELECTRICITY
+    # Aan, maar nog geen berekende reeks (opstarten): gewoon alleen gepubliceerd.
+    ensemble = forecast.ensemble if forecast else None
+    series = forecast.providers if forecast else {}
 
     extra: dict = {}
     if not use_forecast:
         records = published
     elif provider == ENSEMBLE:
-        records = merge(published, primary_series(forecast.ensemble, forecast.providers, cfg))
+        records = merge(published, primary_series(ensemble, series, cfg))
     elif provider == PROVIDER_ALL:
-        records = merge(published, primary_series(forecast.ensemble, forecast.providers, cfg))
-        extra["providers"] = forecast.providers
+        records = merge(published, primary_series(ensemble, series, cfg))
+        extra["providers"] = series
     elif provider in cfg.providers:
         # Ingestelde bron zonder actuele reeks (nog niet opgehaald, backoff, verouderd):
         # geen fout, gewoon alleen de gepubliceerde prijzen.
-        records = merge(published, forecast.providers.get(provider, []))
+        records = merge(published, series.get(provider, []))
     else:
         raise ValueError(f"Onbekende of uitgeschakelde provider: {provider}")
 
@@ -181,7 +187,7 @@ def service_response(
         "unit": ed.unit if ed else None,
         "supplier": supplier,
         "vat_percentage": ed.vat_percentage if ed else None,
-        "forecast_enabled": forecast is not None,
+        "forecast_enabled": enabled,
         "generated_at": dt_util.as_local(now).isoformat(),
         "records": clip(records),
     }

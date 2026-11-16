@@ -30,7 +30,7 @@ from ..const import (
     LOGGER,
 )
 from .accuracy import STORAGE_VERSION, AccuracyTracker
-from .engine import ForecastData, all_slots, build, ensemble_snapshot
+from .engine import ForecastData, all_slots, build, ensemble_snapshot, published_records
 from .model import QUARTER, ForecastConfig, ForecastPoint, ProviderSeries
 from .providers import PROVIDERS, ForecastProvider
 
@@ -87,6 +87,10 @@ class DynTarNLForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
         self.tracker = AccuracyTracker(cfg.window_days) if cfg.accuracy else None
         self._session = async_get_clientsession(hass)
         self._store = Store(hass, STORAGE_VERSION, storage_key(entry.entry_id))
+        self._tick_lock = asyncio.Lock()
+        # Opgeslagen statistiek bewaren als de meting (tijdelijk) uit staat, zodat
+        # 'nauwkeurigheid uit' de opgebouwde historie niet weggooit.
+        self._stored_accuracy: dict | None = None
 
     # --- ophalen -----------------------------------------------------------
 
@@ -100,13 +104,16 @@ class DynTarNLForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
 
     async def async_tick(self, force: bool = False) -> None:
         """Haal op bij providers die aan de beurt zijn. Faalt nooit naar buiten."""
-        now = dt_util.utcnow()
-        due = [k for k in self.providers if force or self.is_due(k, now)]
-        if not due:
-            return
-        results = await asyncio.gather(*(self._fetch_one(k, now) for k in due))
-        fetched = [k for k, ok in zip(due, results) if ok]
-        self.rebuild(snapshot=fetched)
+        if self._tick_lock.locked():
+            return  # er loopt al een ronde (bijv. opstart + eerste kwartier-tik)
+        async with self._tick_lock:
+            now = dt_util.utcnow()
+            due = [k for k in self.providers if force or self.is_due(k, now)]
+            if not due:
+                return
+            results = await asyncio.gather(*(self._fetch_one(k, now) for k in due))
+            fetched = [k for k, ok in zip(due, results) if ok]
+            self.rebuild(snapshot=fetched)
 
     async def _fetch_one(self, key: str, now: datetime) -> bool:
         status = self.status[key]
@@ -150,14 +157,21 @@ class DynTarNLForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
         try:
             now = dt_util.utcnow()
             prices = self.prices.data or {}
+            # Kwartieren met een gepubliceerde prijs zijn geen voorspelling meer: niet als
+            # snapshot bewaren, anders tellen ze (met een verkeerde looptijd) mee in de MAE.
+            known = {r.start for r in published_records(prices.get(ELECTRICITY), "")}
             if self.tracker is not None:
                 for key in snapshot:
                     s = self.series[key]
-                    self.tracker.add_snapshot(key, s.fetched_at, ((p.start, p.price_raw, None) for p in s.points))
+                    self.tracker.add_snapshot(
+                        key, s.fetched_at, ((p.start, p.price_raw, None) for p in s.points if p.start not in known)
+                    )
                 self.tracker.settle(all_slots(prices.get(ELECTRICITY)), now)
             data, combined = build(prices, self.series, self.tracker, self.cfg, self.supplier_name, now)
             if self.tracker is not None and snapshot and combined:
-                self.tracker.add_snapshot(ENSEMBLE, now, ensemble_snapshot(combined))
+                self.tracker.add_snapshot(
+                    ENSEMBLE, now, [x for x in ensemble_snapshot(combined) if x[0] not in known]
+                )
             self._store.async_delay_save(self._data_to_save, _SAVE_DELAY)
         except Exception:  # noqa: BLE001 - nooit de listener-keten van de prijzen breken
             LOGGER.exception("Voorspellingen samenvoegen mislukt")
@@ -182,7 +196,7 @@ class DynTarNLForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
             series[key] = {"f": s.fetched_at.isoformat(), "s": first.isoformat(), "v": values, "e": expanded}
         return {
             "series": series,
-            "accuracy": self.tracker.to_dict() if self.tracker is not None else None,
+            "accuracy": self.tracker.to_dict() if self.tracker is not None else self._stored_accuracy,
         }
 
     async def async_load(self) -> None:
@@ -195,20 +209,34 @@ class DynTarNLForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
         for key, s in (stored.get("series") or {}).items():
             if key not in self.providers:
                 continue
-            first = dt_util.as_utc(dt_util.parse_datetime(s["s"]))
-            points = [
-                ForecastPoint(first + i * QUARTER, v, bool(e))
-                for i, (v, e) in enumerate(zip(s["v"], s["e"]))
-                if v is not None
-            ]
-            fetched_at = dt_util.as_utc(dt_util.parse_datetime(s["f"]))
+            try:
+                first = dt_util.as_utc(dt_util.parse_datetime(s["s"]))
+                points = [
+                    ForecastPoint(first + i * QUARTER, v, bool(e))
+                    for i, (v, e) in enumerate(zip(s["v"], s["e"]))
+                    if v is not None
+                ]
+                fetched_at = dt_util.as_utc(dt_util.parse_datetime(s["f"]))
+            except Exception:  # noqa: BLE001 - een kapotte reeks overslaan, opnieuw ophalen
+                LOGGER.warning("Opgeslagen voorspelling van %s overgeslagen (onleesbaar)", key)
+                continue
             self.series[key] = ProviderSeries(key, fetched_at, points)
             # Anders blijft de last_fetch-sensor na een herstart leeg tot de volgende
             # fetch (tot 6 uur later), terwijl de reeks gewoon vers is.
             self.status[key].last_success = fetched_at
+        self._stored_accuracy = stored.get("accuracy")
         if self.tracker is not None:
-            self.tracker.load(stored.get("accuracy"))
+            try:
+                self.tracker.load(self._stored_accuracy)
+            except Exception:  # noqa: BLE001
+                LOGGER.warning("Opgeslagen nauwkeurigheid onleesbaar; begint opnieuw")
         self.rebuild()
+
+    async def async_flush(self) -> None:
+        """Bij unload: nu opslaan. Anders schrijft een nog lopende vertraagde save (tot 60 s)
+        na het verwijderen het opslagbestand terug, of overschrijft hij na een reload de
+        nieuwere data."""
+        await self._store.async_save(self._data_to_save())
 
     async def async_start(self) -> None:
         """Eerste run (achtergrondtaak): opslag laden, dan ophalen wat nodig is."""

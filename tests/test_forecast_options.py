@@ -272,3 +272,32 @@ def test_leftover_devices_are_removed_own_devices_kept(setup_env):
     }
     hass, _, _ = run({**FORECAST_DEFAULTS, CONF_FORECAST: True}, devices=devices)
     assert hass.device_registry.removed == ["dev-ev"]
+
+
+def test_ensemble_off_with_accuracy_off_is_allowed():
+    """Weging speelt alleen bij het ensemble; zonder ensemble geen foutmelding."""
+    flow = _flow()
+    asyncio.run(flow.async_step_init({CONF_FORECAST: True}))
+    result = asyncio.run(
+        flow.async_step_forecast(_general(**{"forecast_ensemble": False, CONF_FC_ACCURACY: False}))
+    )
+    assert result["step_id"] in ("provider_settings", "advanced")
+
+
+def test_unchanged_provider_settings_are_not_tested_again(monkeypatch):
+    """Een bron die even onbereikbaar is mag het opslaan van andere opties niet blokkeren."""
+    calls = []
+
+    async def down(self, session):
+        calls.append(self.key)
+        return "cannot_connect"
+
+    for cls in PROVIDERS.values():
+        monkeypatch.setattr(cls, "async_validate", down)
+    flow = _flow()
+    asyncio.run(flow.async_step_init({CONF_FORECAST: True}))
+    asyncio.run(flow.async_step_forecast(_general()))
+    result = asyncio.run(
+        flow.async_step_provider_settings({"forecast_epexpredictor_url": FORECAST_DEFAULTS["forecast_epexpredictor_url"]})
+    )
+    assert result["step_id"] == "advanced" and calls == []
