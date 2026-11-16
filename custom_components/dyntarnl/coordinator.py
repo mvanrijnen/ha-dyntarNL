@@ -136,7 +136,18 @@ class DynTarNLCoordinator(DataUpdateCoordinator[PriceData]):
                 _fill_market_from_epex(data, epex)
         except (aiohttp.ClientError, TimeoutError, SourceError) as err:
             raise UpdateFailed(f"Fout bij ophalen tarieven: {err}") from err
+        except (KeyError, TypeError, ValueError, AttributeError) as err:
+            # Onverwachte vorm van het antwoord (bijv. null, lijst i.p.v. object, kapotte
+            # JSON): nette fout i.p.v. een traceback; de cache blijft staan.
+            raise UpdateFailed(f"Onverwacht antwoord van de bron: {type(err).__name__}: {err}") from err
 
         if not data:
             raise UpdateFailed("Geen tarieven ontvangen")
+        # Een half antwoord (bijv. wel gas, geen stroom) of een antwoord zonder 'vandaag'
+        # mag de goede gecachte prijzen niet vervangen: als mislukt behandelen, dan blijft
+        # de cache staan en wordt het elk uur opnieuw geprobeerd.
+        if missing := [energy for energy in (self.data or {}) if energy not in data]:
+            raise UpdateFailed(f"Onvolledig antwoord: geen {', '.join(missing)}")
+        if empty := [energy for energy, ed in data.items() if not ed.today]:
+            raise UpdateFailed(f"Geen prijzen voor vandaag: {', '.join(empty)}")
         return data

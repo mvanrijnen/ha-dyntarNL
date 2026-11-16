@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from datetime import timedelta
 
 import aiohttp
@@ -38,7 +39,29 @@ _VAT_FACTOR = 1.21  # easyEnergy en Frank rekenen met 21% btw (zie bucket_by_day
 
 
 class SourceError(Exception):
-    """De bron antwoordde, maar met een fout (bijv. GraphQL 'errors')."""
+    """De bron antwoordde, maar met een fout (bijv. GraphQL 'errors') of onbruikbare data."""
+
+
+# Grens voor een plausibele prijs (€/kWh of €/m³). Daarboven is het vrijwel zeker een
+# eenheidsfout bij de bron (bijv. €/MWh); liever een nette fout dan 365 €/kWh in HA.
+_MAX_PRICE = 10.0
+
+
+def _num(value, what: str) -> float:
+    """Verplicht, eindig en plausibel bedrag; anders SourceError.
+
+    Zo levert een ontbrekend veld nooit stilletjes een te lage all-in prijs op (bijv.
+    energiebelasting 0), en komt 'NaN'/'Infinity' niet in de sensoren terecht.
+    """
+    if value is None:
+        raise SourceError(f"{what} ontbreekt")
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as err:
+        raise SourceError(f"{what} is geen getal: {value!r}") from err
+    if not math.isfinite(number) or abs(number) > _MAX_PRICE:
+        raise SourceError(f"{what} is niet plausibel: {value!r}")
+    return number
 _UNIT_MAP = {"kWh": "kWh", "m3": "m³", "m³": "m³"}
 
 
@@ -62,8 +85,8 @@ def _date_range() -> tuple[str, str]:
 def _group(groups: list[dict], gtype: str, key: str = "amount") -> float:
     for g in groups:
         if g.get("type") == gtype:
-            return float(g.get(key) or 0.0)
-    return 0.0
+            return _num(g.get(key), f"eon-app {gtype}.{key}")
+    raise SourceError(f"eon-app: groep {gtype} ontbreekt")
 
 
 async def fetch_eon_app(session: aiohttp.ClientSession, host: str) -> PriceData:
@@ -79,7 +102,8 @@ async def fetch_eon_app(session: aiohttp.ClientSession, host: str) -> PriceData:
                 continue
             unit_vat[energy] = (
                 _UNIT_MAP.get(block.get("unitOfMeasurement", ""), block.get("unitOfMeasurement", "")),
-                float(block.get("vatPercentage") or 0),
+                # Ontbreekt het percentage, dan 21% (0 zou de btw van voorspellingen weglaten).
+                float(block.get("vatPercentage") if block.get("vatPercentage") is not None else 21),
             )
             tariffs = block["tariffs"]
             starts = localize_naive_series([t["startDateTime"] for t in tariffs])
@@ -90,7 +114,7 @@ async def fetch_eon_app(session: aiohttp.ClientSession, host: str) -> PriceData:
                     Slot(
                         start=start,
                         end=end,
-                        total=float(t["totalAmount"]),
+                        total=_num(t.get("totalAmount"), "eon-app totalAmount"),
                         market=_group(g, GROUP_MARKET),
                         market_ex=_group(g, GROUP_MARKET, "amountEx"),
                         fee=_group(g, GROUP_FEE),
@@ -140,14 +164,22 @@ async def fetch_easyenergy(session: aiohttp.ClientSession) -> PriceData:
         ends = localize_naive_series([_clean_ts(r["until"]) for r in rows])
         slots: list[Slot] = []
         for r, start, end in zip(rows, starts, ends):
-            market_ex = float(r["price"])
-            market = float(r.get("priceIncVat") or market_ex * _VAT_FACTOR)
-            tax = float(r.get("energyTax") or 0.0)  # incl. btw
-            fee = float(r.get("purchasePrice") or 0.0)  # opslag, incl. btw
+            market_ex = _num(r.get("price"), "easyEnergy price")
+            market = (
+                _num(r["priceIncVat"], "easyEnergy priceIncVat")
+                if r.get("priceIncVat") is not None
+                else market_ex * _VAT_FACTOR
+            )
+            tax = _num(r.get("energyTax"), "easyEnergy energyTax")  # incl. btw
+            fee = _num(r.get("purchasePrice"), "easyEnergy purchasePrice")  # opslag, incl. btw
             # Vaste factor: market/market_ex uit afgeronde bedragen schommelt bij kleine
             # prijzen (tot 21% fout in fee_ex/tax_ex), en is 0/0 bij een prijs van 0.
             factor = _VAT_FACTOR
-            total = float(r["invoicePrice"]) if r.get("invoicePrice") else round(market + fee + tax, 6)
+            total = (
+                _num(r["invoicePrice"], "easyEnergy invoicePrice")
+                if r.get("invoicePrice") is not None
+                else round(market + fee + tax, 6)
+            )
             slots.append(
                 Slot(
                     start=start,
@@ -262,9 +294,12 @@ async def fetch_frank(session: aiohttp.ClientSession) -> PriceData:
             "variables": {"date": day, "resolution": _FRANK_RESOLUTION},
         }
         response = await _post_json(session, FRANK_URL, payload)
-        if response.get("errors") and offset == 0:
+        errors = response.get("errors")
+        if errors and offset == 0:
             # Voor gisteren/morgen is 'nog niet gepubliceerd' normaal; voor vandaag niet.
-            raise SourceError(f"Frank: {response['errors'][0].get('message')}")
+            first = errors[0] if isinstance(errors, list) and errors else errors
+            message = first.get("message") if isinstance(first, dict) else str(first)
+            raise SourceError(f"Frank: {str(message)[:200]}")
         data = response.get("data") or {}
         prices = data.get("marketPrices") or {}
         rows_per_energy[ELECTRICITY].extend(prices.get("electricityPrices") or [])
@@ -274,14 +309,14 @@ async def fetch_frank(session: aiohttp.ClientSession) -> PriceData:
     for energy, unit in ((ELECTRICITY, "kWh"), (GAS, "m³")):
         slots: list[Slot] = []
         for r in rows_per_energy[energy]:
-            market_ex = float(r["marketPrice"])
-            market = round(market_ex + float(r.get("marketPriceTax") or 0.0), 6)
+            market_ex = _num(r.get("marketPrice"), "Frank marketPrice")
+            market = round(market_ex + _num(r.get("marketPriceTax"), "Frank marketPriceTax"), 6)
             factor = _VAT_FACTOR  # vast; zie fetch_easyenergy
             # sourcingMarkupPrice (opslag) is AL incl. btw — net als energyTaxPrice;
             # alleen marketPrice heeft een aparte btw-regel (marketPriceTax).
-            fee = float(r.get("sourcingMarkupPrice") or 0.0)
+            fee = _num(r.get("sourcingMarkupPrice"), "Frank sourcingMarkupPrice")
             fee_ex = round(fee / factor, 6) if factor else fee
-            tax = float(r.get("energyTaxPrice") or 0.0)  # incl. btw
+            tax = _num(r.get("energyTaxPrice"), "Frank energyTaxPrice")  # incl. btw
             tax_ex = round(tax / factor, 6) if factor else tax
             total = round(market + fee + tax, 6)
             slots.append(
@@ -334,9 +369,9 @@ async def fetch_energyzero(session: aiohttp.ClientSession) -> PriceData:
         factor = 1.21
         tax = round(tax_ex * factor, 6)
         slots: list[Slot] = []
-        for r in payload.get("Prices", []):
+        for r in payload.get("Prices") or []:
             start = parse_dt(r["readingDate"])
-            market_ex = float(r["price"])
+            market_ex = _num(r.get("price"), "EnergyZero price")
             market = round(market_ex * factor, 6)
             total = round(market + tax, 6)
             slots.append(

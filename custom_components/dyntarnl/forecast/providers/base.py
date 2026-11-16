@@ -7,6 +7,7 @@ opties). De rest van de voorspellaag kent alleen deze interface.
 
 from __future__ import annotations
 
+import math
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Mapping
 from datetime import datetime, timedelta
@@ -19,6 +20,7 @@ from ...const import FC_TIMEOUT
 from ..model import QUARTER, ForecastPoint, floor_quarter
 
 _TIMEOUT = aiohttp.ClientTimeout(total=FC_TIMEOUT)
+MAX_PRICE = 10.0  # €/kWh; daarboven vrijwel zeker een eenheidsfout bij de bron
 
 
 class ProviderError(Exception):
@@ -45,9 +47,17 @@ def to_quarters(
     stapgrootte), dan wordt elk uur over vier kwartieren verdeeld en gemarkeerd als
     `expanded`. Dubbele kwartieren: de laatste wint.
     """
-    rows = sorted(rows, key=lambda r: r[0])
+    # Onbruikbare waarden (NaN/Infinity, of onplausibel: > 10 €/kWh) overslaan, en dubbele
+    # tijdstippen één keer (de laatste wint) — anders ziet een uurreeks met één dubbele rij
+    # eruit als kwartierdata.
+    unique = {
+        start: price
+        for start, price in rows
+        if isinstance(price, (int, float)) and math.isfinite(price) and abs(price) <= MAX_PRICE
+    }
+    rows = sorted(unique.items())
     if native_minutes is None:
-        steps = {b[0] - a[0] for a, b in zip(rows, rows[1:])}
+        steps = {b[0] - a[0] for a, b in zip(rows, rows[1:])} - {timedelta(0)}
         native_minutes = 60 if steps and min(steps) >= timedelta(hours=1) else 15
 
     points: dict[datetime, ForecastPoint] = {}

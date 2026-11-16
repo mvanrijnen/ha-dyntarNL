@@ -16,6 +16,8 @@ Zonder key maximaal 48 uur, met key tot 120 uur.
 
 from __future__ import annotations
 
+import math
+
 import aiohttp
 import voluptuous as vol
 
@@ -23,7 +25,7 @@ from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, Tex
 
 from ...const import CONF_FC_EPF_API_KEY, EPF_URL, PROVIDER_EPF
 from ..model import ForecastPoint, floor_quarter
-from .base import ForecastProvider, ProviderAuthError, ProviderError, parse_utc, to_quarters
+from .base import MAX_PRICE, ForecastProvider, ProviderAuthError, ProviderError, parse_utc, to_quarters
 
 _REJECTED_KEY_STATES = frozenset({"invalid", "invalid_format", "revoked", "inactive", "expired"})
 _UNIT_FACTOR = {"EUR/kWh": 1.0, "EUR/MWh": 0.001}
@@ -92,7 +94,7 @@ class EnergyPriceForecastProvider(ForecastProvider):
             if factor is None:
                 raise ProviderError(f"Onbekende eenheid: {e.get('unit', default_unit)}")
             price = float(e["value"]) * factor
-            forecast_starts.add(parse_utc(e["start"]))
+            forecast_starts.add(floor_quarter(parse_utc(e["start"])))
             native = int(e.get("native_resolution_minutes") or 15)
             method = e.get("expansion_method")
             if method == "repeat_hourly" or (method is None and native >= 60):
@@ -107,6 +109,8 @@ class EnergyPriceForecastProvider(ForecastProvider):
 
         points = {p.start: p for p in to_quarters(hourly_rows, native_minutes=60)}
         for start, price, from_hour in quarter_rows:
+            if not math.isfinite(price) or abs(price) > MAX_PRICE:
+                continue  # NaN/Infinity of onplausibel: overslaan
             q = floor_quarter(start)
             points[q] = ForecastPoint(q, price, expanded=from_hour)
         # Alleen kwartieren die de bron zelf als voorspelling markeert (een uur kan

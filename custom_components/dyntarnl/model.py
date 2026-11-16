@@ -47,7 +47,7 @@ def tomorrow_complete(data: PriceData | None) -> bool:
     's middags/'s avonds opnieuw proberen. Eén uur van morgen is niet genoeg: voor gas
     staat 00:00–06:00 van morgen (de lopende gasdag) er al ruim vóór de nieuwe gasdag.
     """
-    if not data:
+    if not data or ELECTRICITY not in data:
         return False
     day_after = dt_util.start_of_local_day((dt_util.now() + timedelta(days=2)).date())
     return all(
@@ -109,8 +109,11 @@ def bucket_by_day(slots: list[Slot], unit: str, vat: float) -> EnergyData:
     def day_of(slot: Slot) -> str:
         return slot.start.strftime("%Y-%m-%d")
 
+    # Dubbele rijen van de bron (zelfde tijdstip) één keer tellen; de laatste wint. De twee
+    # 02:00-uren in oktober hebben verschillende tijdstippen en blijven dus allebei.
+    unique = {slot.start.timestamp(): slot for slot in slots}
     buckets: dict[str, list[Slot]] = {}
-    for slot in sorted(slots, key=lambda s: s.start):
+    for _, slot in sorted(unique.items()):
         buckets.setdefault(day_of(slot), []).append(slot)
 
     return EnergyData(
