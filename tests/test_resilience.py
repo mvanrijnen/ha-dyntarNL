@@ -79,3 +79,20 @@ def test_entities_stay_available_with_cached_prices_after_a_failure(started):
     sensor = DynTarNLComponentSensor(coordinator, ELECTRICITY, _COMPONENT_SENSORS[0])
     assert sensor.available
     assert DynTarNLRefreshButton(coordinator).available  # juist dan wil je verversen
+
+
+def test_refresh_button_also_fetches_forecasts(started):
+    """Handmatig verversen = prijzen én (als die aan staan) direct de voorspellingen."""
+    entry, *_ = started
+    coordinator = entry.runtime_data
+    ticks = []
+
+    async def tick(force=False):
+        ticks.append(force)
+
+    coordinator.forecast = SimpleNamespace(async_tick=tick)
+    asyncio.run(DynTarNLRefreshButton(coordinator).async_press())
+    assert ticks == [True]
+    coordinator.forecast = None
+    asyncio.run(DynTarNLRefreshButton(coordinator).async_press())  # zonder voorspellingen: alleen prijzen
+    assert ticks == [True]

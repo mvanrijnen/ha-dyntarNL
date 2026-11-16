@@ -110,7 +110,7 @@ Bijv. `sensor.dyntarnl_e_all_in_now`, `sensor.dyntarnl_g_market_today_avg`.
 | Aanroep | Wat |
 | --- | --- |
 | `button.dyntarnl_refresh` (via `button.press`) | Knop op de device-pagina; verse data ophalen |
-| **`dyntarnl.refresh`** | Service — overal aanroepbaar, ververst de tarieven direct |
+| **`dyntarnl.refresh`** | Service — overal aanroepbaar, ververst de tarieven direct (en, als die aan staan, ook de voorspellingen) |
 | **`dyntarnl.get_prices`** | Service met response data — de volledige prijsreeks, optioneel met voorspellingen (zie [Prijsvoorspellingen](#prijsvoorspellingen-optioneel)) |
 
 ```yaml
@@ -320,6 +320,7 @@ De prijs-*array* verandert maar een paar keer per dag, dus de integratie is zuin
   netwerk-call, puur uit de cache.
 - **Handmatig:** de knop **"Refresh"** (`button.dyntarnl_refresh`, op de device-pagina,
   onder Configuratie). Die kun je ook vanuit automatiseringen aanroepen via `button.press`.
+  Staan de voorspellingen aan, dan haalt de knop die ook meteen opnieuw op.
 
 ## Prijsvoorspellingen (optioneel)
 

@@ -82,7 +82,7 @@
   "services": {
     "refresh": {
       "name": "Tarieven verversen",
-      "description": "Haalt de dynamische tarieven direct opnieuw op."
+      "description": "Haalt de dynamische tarieven direct opnieuw op (en de prijsvoorspellingen, als die aan staan)."
     },
     "get_prices": {
       "name": "Prijzen ophalen",

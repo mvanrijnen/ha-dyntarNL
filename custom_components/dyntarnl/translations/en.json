@@ -82,7 +82,7 @@
   "services": {
     "refresh": {
       "name": "Refresh tariffs",
-      "description": "Fetches the dynamic tariffs again right away."
+      "description": "Fetches the dynamic tariffs again right away (and the price forecasts, when enabled)."
     },
     "get_prices": {
       "name": "Get prices",

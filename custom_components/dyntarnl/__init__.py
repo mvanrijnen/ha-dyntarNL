@@ -72,7 +72,7 @@ def _register_services(hass: HomeAssistant) -> None:
             for entry in hass.config_entries.async_entries(DOMAIN):
                 coordinator: DynTarNLCoordinator | None = getattr(entry, "runtime_data", None)
                 if coordinator is not None:
-                    await coordinator.async_request_refresh()
+                    await coordinator.async_refresh_all()
 
         hass.services.async_register(DOMAIN, SERVICE_REFRESH, _handle_refresh)
 

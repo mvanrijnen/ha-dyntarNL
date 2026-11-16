@@ -85,6 +85,14 @@ class DynTarNLCoordinator(DataUpdateCoordinator[PriceData]):
         # Optionele voorspel-coordinator (forecast/coordinator.py); None = uit.
         self.forecast = None
 
+    async def async_refresh_all(self) -> None:
+        """Handmatig verversen (knop/service): de prijzen én — als die aan staan — direct de
+        voorspellingen, buiten hun eigen 6-uursschema om. Alleen op verzoek van de gebruiker,
+        dus geen extra belasting van de (gratis) voorspellers."""
+        await self.async_request_refresh()
+        if self.forecast is not None:
+            await self.forecast.async_tick(force=True)
+
     def async_rebucket(self) -> None:
         """Nieuwe dag: gisteren/vandaag/morgen opnieuw indelen uit de cache (geen netwerk).
 

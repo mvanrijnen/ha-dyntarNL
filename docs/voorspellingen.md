@@ -478,6 +478,9 @@ content: |
   weinig zin, want de modellen werken met weersverwachtingen die ook maar een paar keer per dag
   verversen.
 - Het exacte moment verschilt per installatie, zodat niet iedereen tegelijk aanklopt.
+- **Direct opnieuw ophalen:** de knop **Refresh** (`button.dyntarnl_refresh`) of de service
+  `dyntarnl.refresh` haalt naast de prijzen ook de voorspellingen meteen opnieuw op, buiten het
+  schema om. Alleen als jij erom vraagt, dus geen extra belasting van de voorspellers.
 - Na een herstart wordt niet opnieuw opgehaald zolang de bewaarde voorspelling nog vers is.
 - Elke bron heeft een eigen time-out (20 s). Na een fout wacht DynTarNL steeds langer voor een
   nieuwe poging: 30 minuten, 1 uur, 2 uur, … tot maximaal 12 uur.

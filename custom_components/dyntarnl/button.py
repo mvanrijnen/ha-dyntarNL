@@ -41,7 +41,7 @@ class DynTarNLRefreshButton(CoordinatorEntity[DynTarNLCoordinator], ButtonEntity
         return True
 
     async def async_press(self) -> None:
-        await self.coordinator.async_request_refresh()
+        await self.coordinator.async_refresh_all()
 
 
 async def async_setup_entry(
