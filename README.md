@@ -6,7 +6,7 @@
 
 [![Tests](https://github.com/mvanrijnen/ha-dyntarNL/actions/workflows/test.yml/badge.svg)](https://github.com/mvanrijnen/ha-dyntarNL/actions/workflows/test.yml)
 [![Validate](https://github.com/mvanrijnen/ha-dyntarNL/actions/workflows/validate.yml/badge.svg)](https://github.com/mvanrijnen/ha-dyntarNL/actions/workflows/validate.yml)
-[![hacs](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![hacs](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/integration)
 [![release](https://img.shields.io/github/v/release/mvanrijnen/ha-dyntarNL)](https://github.com/mvanrijnen/ha-dyntarNL/releases)
 
 Home Assistant integratie die de **dynamische energietarieven van meerdere Nederlandse
@@ -642,23 +642,25 @@ Elk record heeft de velden:
 
 ## Installatie (HACS)
 
-**Snel — via de knop** (vereist dat HACS al geïnstalleerd is):
+DynTarNL zit in de standaard HACS-lijst.
+
+1. **HACS** openen → zoek op **DynTarNL** → **Download**
+2. Home Assistant **herstarten**
+3. Integratie toevoegen met de knop hieronder, of via
+   **Instellingen → Apparaten & Services → Integratie toevoegen** → *DynTarNL*
 
 [![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=mvanrijnen&repository=ha-dyntarNL&category=integration)
-
-Klik de knop → HACS opent op jouw Home Assistant met deze repo al ingevuld → **Download** en
-herstart Home Assistant. Voeg daarna de integratie toe met de knop hieronder (of via
-**Instellingen → Apparaten & Services → Integratie toevoegen** → *DynTarNL*):
-
 [![Add integration](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=dyntarnl)
 
-**Handmatig:**
+<details>
+<summary>Zonder HACS, of op een oudere HACS-versie</summary>
 
-1. HACS → ⋮ → **Custom repositories** → `https://github.com/mvanrijnen/ha-dyntarNL`, categorie **Integration**.
-2. Installeer **DynTarNL** en herstart Home Assistant.
-3. **Instellingen → Apparaten & Services → Integratie toevoegen** → zoek *DynTarNL* → kies je leverancier.
+Als custom repository: HACS → ⋮ → **Custom repositories** →
+`https://github.com/mvanrijnen/ha-dyntarNL`, categorie **Integration**.
 
-Of handmatig: kopieer `custom_components/dyntarnl/` naar je Home Assistant `config/custom_components/` en herstart.
+Of handmatig: kopieer `custom_components/dyntarnl/` naar je Home Assistant
+`config/custom_components/` en herstart.
+</details>
 
 ### Leverancier of tarieven wijzigen
 
