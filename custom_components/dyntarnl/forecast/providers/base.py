@@ -75,6 +75,9 @@ class ForecastProvider(ABC):
 
     def __init__(self, options: Mapping) -> None:
         self.options = options
+        #: Wat de bron bij de laatste fetch over zichzelf meldde (plan, horizon, …);
+        #: verschijnt als attributen op de last_fetch-diagnosesensor.
+        self.info: dict = {}
 
     def option_fields(self) -> dict:
         """voluptuous-velden voor de options flow (leeg = geen eigen instellingen)."""

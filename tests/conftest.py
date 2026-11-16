@@ -177,6 +177,7 @@ def _install_ha_stubs() -> None:
             self.hass = hass
             self.config_entry = config_entry
             self.data = None
+            self.last_update_success = True
             self._listeners = []
 
         def async_add_listener(self, update_callback, context=None):
@@ -230,6 +231,9 @@ def _install_ha_stubs() -> None:
     dt.utcnow = lambda: dt._now.astimezone(timezone.utc)
     dt.as_local = lambda d: d.astimezone(AMS)
     dt.as_utc = lambda d: d.astimezone(timezone.utc)
+    dt.start_of_local_day = lambda d=None: datetime.combine(
+        (d or dt._now).date() if isinstance(d, datetime) else (d or dt._now.date()), datetime.min.time(), AMS
+    )
     util.dt = dt
 
     _mod("homeassistant.components")
@@ -262,6 +266,8 @@ def _install_ha_stubs() -> None:
 
     binary.BinarySensorEntityDescription = BinarySensorEntityDescription
     binary.BinarySensorEntity = object
+
+    _mod("homeassistant.components.button").ButtonEntity = object
 
 
 _install_ha_stubs()

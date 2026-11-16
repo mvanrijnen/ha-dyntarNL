@@ -1,0 +1,66 @@
+"""Zomer-/wintertijd met de echte tijdzone Europe/Amsterdam (de stub rekent met +02:00)."""
+
+import sys
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+
+import pytest
+
+from dyntarnl.model import Slot, localize_naive_series
+from dyntarnl.prices import slot_at
+
+AMS = ZoneInfo("Europe/Amsterdam")
+UTC = timezone.utc
+
+
+@pytest.fixture
+def real_tz(monkeypatch):
+    dt = sys.modules["homeassistant.util.dt"]
+    monkeypatch.setattr(dt, "DEFAULT_TIME_ZONE", AMS)
+    monkeypatch.setattr(dt, "as_local", lambda d: d.astimezone(AMS))
+    return dt
+
+
+def _hourly(starts):
+    # Eind in UTC berekenen: 'start + 1 uur' op een lokale tijd is wandklok-rekenen.
+    return [
+        Slot(start=s, end=(s.astimezone(UTC) + timedelta(hours=1)).astimezone(AMS), total=float(i), market=0, market_ex=0)
+        for i, s in enumerate(starts)
+    ]
+
+
+def test_spring_forward_easyenergy_labels(real_tz):
+    """easyEnergy op 29-03-2026: 23 rijen '00:00'…'22:00', inclusief het niet-bestaande
+    '02:00' en zonder '23:00'. Label '02:00' = 03:00 CEST, alles daarna een uur later."""
+    labels = [f"2026-03-29T{h:02d}:00:00" for h in range(23)]
+    starts = localize_naive_series(labels)
+    utc_hours = [s.astimezone(UTC).hour for s in starts]
+    assert utc_hours == [23] + list(range(0, 22))  # 00:00 CET = 23:00Z, daarna aaneengesloten
+    assert starts[-1].astimezone(AMS).hour == 23  # het laatste uur van de dag is er
+    assert len({s.timestamp() for s in starts}) == 23
+
+
+def test_fall_back_duplicate_hour_gets_fold(real_tz):
+    """eon-app op 25-10-2026: '02:00' twee keer → eerste CEST, tweede CET."""
+    labels = [f"2026-10-25T{h:02d}:00:00" for h in (0, 1, 2, 2, 3, 4)]
+    starts = localize_naive_series(labels)
+    assert [s.astimezone(UTC).hour for s in starts] == [22, 23, 0, 1, 2, 3]
+
+
+def test_fall_back_slot_at_picks_the_right_02_hour(real_tz):
+    """Slots uit UTC-bronnen (Frank): om 02:30 CEST het eerste, om 02:30 CET het tweede uur."""
+    starts = [(datetime(2026, 10, 24, 22, tzinfo=UTC) + timedelta(hours=h)).astimezone(AMS) for h in range(6)]
+    slots = _hourly(starts)
+    first = datetime(2026, 10, 25, 0, 30, tzinfo=UTC).astimezone(AMS)   # 02:30 CEST
+    second = datetime(2026, 10, 25, 1, 30, tzinfo=UTC).astimezone(AMS)  # 02:30 CET
+    assert slot_at(slots, first).total == 2
+    assert slot_at(slots, second).total == 3
+
+
+def test_next_hour_over_spring_gap(real_tz):
+    """Om 01:30 CET op 29-03 is 'volgend uur' 03:00 CEST (één echt uur later)."""
+    starts = [(datetime(2026, 3, 28, 23, tzinfo=UTC) + timedelta(hours=h)).astimezone(AMS) for h in range(5)]
+    slots = _hourly(starts)
+    now = datetime(2026, 3, 29, 1, 30, tzinfo=AMS)
+    nxt = slot_at(slots, now.astimezone(UTC) + timedelta(hours=1))
+    assert nxt.start.astimezone(AMS).hour == 3

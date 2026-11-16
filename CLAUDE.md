@@ -96,10 +96,16 @@ Data flows: **supplier registry → platform fetcher → shared `Slot` model →
 - **Gas follows the Dutch gas day (06:00–06:00)**, so gas slots are not "one price per calendar
   day". `slot_at()` is start-inclusive/end-exclusive and works for both energy types; never
   index price arrays by hour.
-- **Fetch cadence is deliberately sparse** (`__init__.py`): startup, 00:00 (re-bucket the new
-  day), and 13:30/14:30/15:30/16:30 for tomorrow's day-ahead prices. Every other whole hour only
-  calls `async_update_listeners()` — sensors roll forward from cache with **no network call**.
+- **Fetch cadence is deliberately sparse** (`__init__.py`): startup, 00:00 (first
+  `async_rebucket()` from cache, then fetch), and every half hour from 13:00 until tomorrow is
+  complete up to 24:00 (`tomorrow_complete`). After a *failed* fetch it retries every hour.
+  Every other whole hour only calls `async_update_listeners()` — **no network call**. Entities
+  stay available on cached prices after a failed fetch; the refresh button is always available.
   Do not add an `update_interval`.
+- **Time:** compare instants, never wall clocks. `slot_at()` uses timestamps and "next/prev hour"
+  is `as_utc(now) ± 1h` (Python ignores `fold` when both sides share a tzinfo). Naive local
+  timestamps (eon-app, easyEnergy) go through `localize_naive_series()` (DST gap/duplicate hour).
+  easyEnergy gas is fetched per **hour** (`granularity=day` gives calendar-day averages).
 - **Feed-in threshold** lives in `prices.py`: `feed_in_value = market − fee`. Negative means
   exporting costs money. Sources without a real markup (`fee = 0`) collapse this to `market < 0`.
 - **Unique IDs** are `{entry_id}_{energy}_{...}` and entity names are compact English

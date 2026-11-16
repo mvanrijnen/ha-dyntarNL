@@ -44,10 +44,18 @@ def test_parse_dt_naive_is_local():
     assert parsed.hour == 5
 
 
-def _ed(tomorrow):
-    slot = Slot(start=None, end=None, total=0.3, market=0.2, market_ex=0.16)
-    return EnergyData(unit="kWh", vat_percentage=21.0, today=[slot],
-                      tomorrow=[slot] if tomorrow else None)
+def _hours(day: str, first: int, last: int) -> list[Slot]:
+    """Uur-slots [first, last) op een lokale datum (AMS, zoals de test-stub)."""
+    base = datetime.fromisoformat(f"{day}T00:00:00+02:00")
+    return [
+        Slot(start=base + timedelta(hours=h), end=base + timedelta(hours=h + 1), total=0.3, market=0.2, market_ex=0.16)
+        for h in range(first, last)
+    ]
+
+
+def _ed(tomorrow, hours=24):
+    return EnergyData(unit="kWh", vat_percentage=21.0, today=_hours("2026-08-17", 0, 24),
+                      tomorrow=_hours("2026-08-18", 0, hours) if tomorrow else None)
 
 
 def test_tomorrow_complete_needs_every_energy_type():
@@ -60,3 +68,8 @@ def test_tomorrow_complete_needs_every_energy_type():
 def test_tomorrow_complete_on_empty_data():
     assert not tomorrow_complete(None)
     assert not tomorrow_complete({})
+
+
+def test_tomorrow_partially_known_is_not_complete():
+    """Gas: 00–06 van morgen (lopende gasdag) is er al vroeg; dat is nog niet 'morgen'."""
+    assert not tomorrow_complete({"electricity": _ed(True), "gas": _ed(True, hours=6)})

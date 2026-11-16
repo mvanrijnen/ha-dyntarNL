@@ -22,9 +22,10 @@ from .const import (
     PLATFORM_FRANK,
     supplier_by_key,
 )
-from .model import PriceData
+from .model import PriceData, bucket_by_day
 from .sources import (
     EpexMap,
+    SourceError,
     build_custom,
     fetch_easyenergy,
     fetch_energyzero,
@@ -42,7 +43,7 @@ def _fill_market_from_epex(data: PriceData, epex: EpexMap) -> None:
         emap = epex.get(energy, {})
         for slots in (ed.yesterday, ed.today, ed.tomorrow):
             for s in slots or []:
-                if s.has_breakdown and s.market_ex:
+                if s.has_breakdown:
                     continue
                 market_ex = emap.get(s.start.isoformat())
                 if market_ex is not None:
@@ -55,7 +56,8 @@ def _needs_epex_fallback(data: PriceData) -> bool:
     for ed in data.values():
         for slots in (ed.today, ed.tomorrow, ed.yesterday):
             for s in slots or []:
-                if not s.market_ex:
+                # Niet op market_ex == 0 testen: een beursprijs van precies 0 is echt.
+                if not s.has_breakdown:
                     return True
     return False
 
@@ -83,6 +85,21 @@ class DynTarNLCoordinator(DataUpdateCoordinator[PriceData]):
         # Optionele voorspel-coordinator (forecast/coordinator.py); None = uit.
         self.forecast = None
 
+    def async_rebucket(self) -> None:
+        """Nieuwe dag: gisteren/vandaag/morgen opnieuw indelen uit de cache (geen netwerk).
+
+        Zo kloppen de sensoren direct na middernacht, ook als de fetch van 00:00 mislukt.
+        """
+        if not self.data:
+            return
+        self.data = {
+            energy: bucket_by_day(
+                (ed.yesterday or []) + ed.today + (ed.tomorrow or []), ed.unit, ed.vat_percentage
+            )
+            for energy, ed in self.data.items()
+        }
+        self.async_update_listeners()
+
     async def _async_update_data(self) -> PriceData:
         supplier = self.supplier
         if supplier is None:
@@ -109,7 +126,7 @@ class DynTarNLCoordinator(DataUpdateCoordinator[PriceData]):
             if _needs_epex_fallback(data):
                 epex = await fetch_epex(self._session)
                 _fill_market_from_epex(data, epex)
-        except (aiohttp.ClientError, TimeoutError) as err:
+        except (aiohttp.ClientError, TimeoutError, SourceError) as err:
             raise UpdateFailed(f"Fout bij ophalen tarieven: {err}") from err
 
         if not data:

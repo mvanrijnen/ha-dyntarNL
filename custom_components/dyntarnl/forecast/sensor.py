@@ -182,6 +182,8 @@ def _status_attrs(c: Coord, provider: str) -> dict:
         "points": len(series.points) if series else 0,
         "expanded_points": sum(p.expanded for p in series.points) if series else 0,
         "forecast_until": iso(series.points[-1].start + timedelta(minutes=15)) if series and series.points else None,
+        # Wat de bron zelf meldt (bijv. plan/horizon bij Energy Price Forecast EU).
+        **(c.providers[provider].info if provider in c.providers else {}),
     }
 
 

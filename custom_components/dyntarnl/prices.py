@@ -51,9 +51,15 @@ def tariff_from_slot(slot: Slot, vat: float) -> Tariff:
 
 
 def slot_at(slots: list[Slot], moment: datetime) -> Slot | None:
-    """Vind het uur-slot dat `moment` bevat (gas verspringt om 06:00, gasdag)."""
+    """Vind het uur-slot dat `moment` bevat (gas verspringt om 06:00, gasdag).
+
+    Vergelijkt echte tijdstippen (timestamp). Python vergelijkt datetimes met dezelfde
+    tijdzone op wandklok en negeert `fold`, waardoor het dubbele uur bij de overgang naar
+    wintertijd het verkeerde slot gaf.
+    """
+    t = moment.timestamp()
     for slot in slots:
-        if slot.start <= moment < slot.end:
+        if slot.start.timestamp() <= t < slot.end.timestamp():
             return slot
     return None
 

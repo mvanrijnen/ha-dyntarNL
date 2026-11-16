@@ -211,9 +211,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -> 
 
     @callback
     def _hourly(now) -> None:
-        """Elk heel uur. Na middernacht opnieuw ophalen (nieuwe dag → herbucketen);
-        de overige uren alleen de sensoren laten meerollen — zónder netwerk-call."""
+        """Elk heel uur. Na middernacht eerst uit de cache herindelen (nieuwe dag) en dan
+        opnieuw ophalen. Mislukte de vorige fetch, dan elk uur opnieuw proberen; anders
+        alleen de sensoren laten meerollen — zónder netwerk-call."""
         if now.hour == 0:
+            coordinator.async_rebucket()
+            _fetch()
+        elif not coordinator.last_update_success:
             _fetch()
         else:
             coordinator.async_update_listeners()
@@ -225,8 +229,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -> 
 
     @callback
     def _retry_tomorrow(_now=None) -> None:
-        """Elk half uur vanaf 13:00: alleen ophalen zolang morgen nog ontbreekt."""
-        if not tomorrow_complete(coordinator.data):
+        """Elk half uur vanaf 13:00: alleen ophalen zolang morgen nog ontbreekt (of de
+        vorige poging mislukte)."""
+        if not coordinator.last_update_success or not tomorrow_complete(coordinator.data):
             _fetch()
 
     # 2) Doorproberen tot de prijzen van morgen binnen zijn (ook 's avonds). Elk half

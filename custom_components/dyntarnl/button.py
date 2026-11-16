@@ -35,6 +35,11 @@ class DynTarNLRefreshButton(CoordinatorEntity[DynTarNLCoordinator], ButtonEntity
             entry_type=DeviceEntryType.SERVICE,
         )
 
+    @property
+    def available(self) -> bool:
+        # Altijd bruikbaar: juist na een mislukte fetch wil je opnieuw kunnen verversen.
+        return True
+
     async def async_press(self) -> None:
         await self.coordinator.async_request_refresh()
 

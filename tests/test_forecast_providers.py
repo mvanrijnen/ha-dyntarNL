@@ -147,3 +147,18 @@ def test_epf_linear_center_keeps_each_quarter(load_fixture):
     # binnen één uur verschillende waarden
     first_hour = [p.price_raw for p in points[:4]]
     assert len(set(first_hour)) > 1
+
+
+def test_epf_reports_plan_and_key_state(load_fixture):
+    """Zichtbaar maken wat EPF levert: gratis of Pro, horizon, key-status, methode."""
+    payload = load_fixture("energypriceforecast_nl_linear.json")
+    payload["meta"].update({"plan": "private_pro", "allowed_horizon_hours": 120, "api_key_state": "valid"})
+    provider = EnergyPriceForecastProvider({CONF_FC_EPF_API_KEY: "k"})
+    provider._get_json = _fake(payload, [])
+    asyncio.run(provider.async_fetch(None, 120))
+    assert provider.info == {
+        "plan": "private_pro",
+        "allowed_horizon_hours": 120,
+        "api_key_state": "valid",
+        "expansion_method": "linear_center",
+    }

@@ -41,12 +41,50 @@ type PriceData = dict[str, EnergyData]
 
 
 def tomorrow_complete(data: PriceData | None) -> bool:
-    """True zodra voor élk energietype de prijzen van morgen binnen zijn.
+    """True zodra voor élk energietype de prijzen van morgen tot 24:00 binnen zijn.
 
     Stuurt de ophaal-retries aan: zolang dit False is blijft de integratie het
-    's middags/'s avonds opnieuw proberen.
+    's middags/'s avonds opnieuw proberen. Eén uur van morgen is niet genoeg: voor gas
+    staat 00:00–06:00 van morgen (de lopende gasdag) er al ruim vóór de nieuwe gasdag.
     """
-    return bool(data) and all(ed.tomorrow for ed in data.values())
+    if not data:
+        return False
+    day_after = dt_util.start_of_local_day((dt_util.now() + timedelta(days=2)).date())
+    return all(
+        ed.tomorrow and max(s.end for s in ed.tomorrow).timestamp() >= day_after.timestamp()
+        for ed in data.values()
+    )
+
+
+def localize_naive_series(values: list[str]) -> list[datetime]:
+    """Opeenvolgende naïeve lokale tijden (eon-app, easyEnergy) → echte lokale tijden.
+
+    Rond de klokwissel is een naïeve tijd niet eenduidig:
+    - Zomertijd (maart): een bron die het niet-bestaande '02:00' noemt (easyEnergy) bedoelt
+      03:00, en schuift alles daarna een uur op; vanaf dat label tellen we +1 uur.
+    - Wintertijd (oktober): een tweede '02:00' direct na het eerste is het CET-uur (fold=1).
+    """
+    tz = dt_util.DEFAULT_TIME_ZONE
+    out: list[datetime] = []
+    shifted_date = None
+    previous = None
+    for value in values:
+        naive = dt_util.parse_datetime(value)
+        if naive is None:
+            raise ValueError(f"Ongeldige datum/tijd: {value}")
+        if naive.tzinfo is not None:
+            out.append(dt_util.as_local(naive))
+            previous = None
+            continue
+        aware = naive.replace(tzinfo=tz, fold=1 if naive == previous else 0)
+        instant = dt_util.as_utc(aware)
+        if dt_util.as_local(instant).replace(tzinfo=None, fold=0) != naive:
+            shifted_date = naive.date()  # bestaat niet: de klok sprong hier vooruit
+        elif shifted_date == naive.date():
+            instant += timedelta(hours=1)
+        out.append(dt_util.as_local(instant))
+        previous = naive
+    return out
 
 
 def parse_dt(value: str) -> datetime:

@@ -39,12 +39,12 @@ def _current(data: EnergyData, now: datetime, price: PriceFn) -> float | None:
 
 
 def _next_hour(data: EnergyData, now: datetime, price: PriceFn) -> float | None:
-    slot = _slot_at(data.today + (data.tomorrow or []), now + timedelta(hours=1))
+    slot = _slot_at(data.today + (data.tomorrow or []), dt_util.as_utc(now) + timedelta(hours=1))
     return price(slot) if slot else None
 
 
 def _previous_hour(data: EnergyData, now: datetime, price: PriceFn) -> float | None:
-    slot = _slot_at((data.yesterday or []) + data.today, now - timedelta(hours=1))
+    slot = _slot_at((data.yesterday or []) + data.today, dt_util.as_utc(now) - timedelta(hours=1))
     return price(slot) if slot else None
 
 
@@ -128,6 +128,8 @@ class DynTarNLPriceSensor(DynTarNLEntity, SensorEntity):
     entity_description: DynTarNLSensorDescription
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_suggested_display_precision = 5
+    # De dag-reeksen veranderen elk uur mee en zijn groot: niet in de recorder.
+    _unrecorded_attributes = frozenset({"yesterday", "today", "tomorrow", "prices"})
 
     def __init__(self, coordinator, energy, basis_key, price_fn, description) -> None:
         super().__init__(coordinator, energy)
@@ -139,7 +141,7 @@ class DynTarNLPriceSensor(DynTarNLEntity, SensorEntity):
 
     @property
     def native_unit_of_measurement(self) -> str:
-        unit = self._data.unit if self._data else "kWh"
+        unit = self._data.unit if self._data else ("m³" if self._energy == GAS else "kWh")
         return f"{CURRENCY_EURO}/{unit}"
 
     @property
@@ -194,7 +196,7 @@ class DynTarNLComponentSensor(DynTarNLEntity, SensorEntity):
 
     @property
     def native_unit_of_measurement(self) -> str:
-        unit = self._data.unit if self._data else "kWh"
+        unit = self._data.unit if self._data else ("m³" if self._energy == GAS else "kWh")
         return f"{CURRENCY_EURO}/{unit}"
 
     @property
@@ -222,7 +224,7 @@ def _feedin_cost_now(data: EnergyData, now: datetime) -> float | None:
 
 
 def _feedin_cost_next(data: EnergyData, now: datetime) -> float | None:
-    slot = _slot_at(data.today + (data.tomorrow or []), now + timedelta(hours=1))
+    slot = _slot_at(data.today + (data.tomorrow or []), dt_util.as_utc(now) + timedelta(hours=1))
     return max(0.0, -feed_in_value(slot)) if slot else None
 
 
@@ -262,7 +264,7 @@ class DynTarNLFeedInSensor(DynTarNLEntity, SensorEntity):
     def native_unit_of_measurement(self) -> str:
         if self.entity_description.is_hours:
             return UnitOfTime.HOURS
-        unit = self._data.unit if self._data else "kWh"
+        unit = self._data.unit if self._data else ("m³" if self._energy == GAS else "kWh")
         return f"{CURRENCY_EURO}/{unit}"
 
     @property

@@ -28,11 +28,11 @@ def _now_slot(data, now):
 
 
 def _next_slot(data, now):
-    return slot_at(data.today + (data.tomorrow or []), now + timedelta(hours=1))
+    return slot_at(data.today + (data.tomorrow or []), dt_util.as_utc(now) + timedelta(hours=1))
 
 
 def _prev_slot(data, now):
-    return slot_at((data.yesterday or []) + data.today, now - timedelta(hours=1))
+    return slot_at((data.yesterday or []) + data.today, dt_util.as_utc(now) - timedelta(hours=1))
 
 
 def _neg_now(data, now):

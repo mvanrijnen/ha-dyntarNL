@@ -72,6 +72,16 @@ class EnergyPriceForecastProvider(ForecastProvider):
         if not isinstance(entries, list):
             raise ProviderError("Energy Price Forecast: 'entries' ontbreekt")
 
+        # Laten zien wat de bron bij deze gebruiker levert (gratis/Pro, horizon, key, en hoe
+        # uurvoorspellingen naar kwartieren gaan). Detecteert o.a. of een Pro-key werkt.
+        methods = sorted({e.get("expansion_method") for e in entries if e.get("source") == "forecast"} - {None})
+        self.info = {
+            "plan": meta.get("plan"),
+            "allowed_horizon_hours": meta.get("allowed_horizon_hours"),
+            "api_key_state": meta.get("api_key_state"),
+            "expansion_method": ", ".join(methods) or None,
+        }
+
         default_unit = payload.get("unit", "EUR/kWh")
         quarter_rows, hourly_rows = [], []
         forecast_starts = set()

@@ -40,4 +40,6 @@ class DynTarNLEntity(CoordinatorEntity[DynTarNLCoordinator]):
 
     @property
     def available(self) -> bool:
-        return super().available and self._data is not None
+        # Niet afhankelijk van de laatste fetch: een mislukte poging (bijv. voor de prijzen
+        # van morgen) mag de bekende prijzen van vandaag niet 'unavailable' maken.
+        return self.coordinator.data is not None and self._data is not None

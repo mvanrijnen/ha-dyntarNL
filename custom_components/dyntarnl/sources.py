@@ -30,10 +30,15 @@ from .const import (
     GROUP_MARKET,
     GROUP_TAX,
 )
-from .model import EnergyData, PriceData, Slot, bucket_by_day, parse_dt
+from .model import EnergyData, PriceData, Slot, bucket_by_day, localize_naive_series, parse_dt
 from .prices import Tariff, apply_formula
 
 _TIMEOUT = aiohttp.ClientTimeout(total=30)
+_VAT_FACTOR = 1.21  # easyEnergy en Frank rekenen met 21% btw (zie bucket_by_day(..., 21.0))
+
+
+class SourceError(Exception):
+    """De bron antwoordde, maar met een fout (bijv. GraphQL 'errors')."""
 _UNIT_MAP = {"kWh": "kWh", "m3": "m³", "m³": "m³"}
 
 
@@ -76,12 +81,15 @@ async def fetch_eon_app(session: aiohttp.ClientSession, host: str) -> PriceData:
                 _UNIT_MAP.get(block.get("unitOfMeasurement", ""), block.get("unitOfMeasurement", "")),
                 float(block.get("vatPercentage") or 0),
             )
-            for t in block["tariffs"]:
+            tariffs = block["tariffs"]
+            starts = localize_naive_series([t["startDateTime"] for t in tariffs])
+            ends = localize_naive_series([t["endDateTime"] for t in tariffs])
+            for t, start, end in zip(tariffs, starts, ends):
                 g = t.get("groups", [])
                 per_energy[energy].append(
                     Slot(
-                        start=parse_dt(t["startDateTime"]),
-                        end=parse_dt(t["endDateTime"]),
+                        start=start,
+                        end=end,
                         total=float(t["totalAmount"]),
                         market=_group(g, GROUP_MARKET),
                         market_ex=_group(g, GROUP_MARKET, "amountEx"),
@@ -125,20 +133,25 @@ async def fetch_easyenergy(session: aiohttp.ClientSession) -> PriceData:
     de eigen opslag (purchasePrice) en de all-in (invoicePrice) — allemaal incl. btw.
     """
     result: PriceData = {}
-    for energy, unit, gran in ((ELECTRICITY, "kWh", "hour"), (GAS, "m³", "day")):
+    # Gas per uur: 'day' geeft kalenderdaggemiddelden (00–00) i.p.v. de gasdag (06–06).
+    for energy, unit, gran in ((ELECTRICITY, "kWh", "hour"), (GAS, "m³", "hour")):
         rows = await _easyenergy_rows(session, energy, gran)
+        starts = localize_naive_series([_clean_ts(r["from"]) for r in rows])
+        ends = localize_naive_series([_clean_ts(r["until"]) for r in rows])
         slots: list[Slot] = []
-        for r in rows:
+        for r, start, end in zip(rows, starts, ends):
             market_ex = float(r["price"])
-            market = float(r.get("priceIncVat") or market_ex * 1.21)
+            market = float(r.get("priceIncVat") or market_ex * _VAT_FACTOR)
             tax = float(r.get("energyTax") or 0.0)  # incl. btw
             fee = float(r.get("purchasePrice") or 0.0)  # opslag, incl. btw
-            factor = market / market_ex if market_ex else 1.21
+            # Vaste factor: market/market_ex uit afgeronde bedragen schommelt bij kleine
+            # prijzen (tot 21% fout in fee_ex/tax_ex), en is 0/0 bij een prijs van 0.
+            factor = _VAT_FACTOR
             total = float(r["invoicePrice"]) if r.get("invoicePrice") else round(market + fee + tax, 6)
             slots.append(
                 Slot(
-                    start=parse_dt(_clean_ts(r["from"])),
-                    end=parse_dt(_clean_ts(r["until"])),
+                    start=start,
+                    end=end,
                     total=round(total, 6),
                     market=market,
                     market_ex=market_ex,
@@ -160,10 +173,10 @@ type EpexMap = dict[str, dict[str, float]]  # energy -> {iso-uur: market_ex}
 async def fetch_epex(session: aiohttp.ClientSession) -> EpexMap:
     """Altijd-opgehaalde kale EPEX-beursprijs (excl. btw) per uur, via easyEnergy."""
     epex: EpexMap = {ELECTRICITY: {}, GAS: {}}
-    for energy, gran in ((ELECTRICITY, "hour"), (GAS, "day")):
-        for r in await _easyenergy_rows(session, energy, gran):
-            key = parse_dt(_clean_ts(r["from"])).isoformat()
-            epex[energy][key] = float(r["price"])
+    for energy, gran in ((ELECTRICITY, "hour"), (GAS, "hour")):
+        rows = await _easyenergy_rows(session, energy, gran)
+        for r, start in zip(rows, localize_naive_series([_clean_ts(r["from"]) for r in rows])):
+            epex[energy][start.isoformat()] = float(r["price"])
     return epex
 
 
@@ -248,7 +261,11 @@ async def fetch_frank(session: aiohttp.ClientSession) -> PriceData:
             "query": _FRANK_QUERY,
             "variables": {"date": day, "resolution": _FRANK_RESOLUTION},
         }
-        data = (await _post_json(session, FRANK_URL, payload)).get("data") or {}
+        response = await _post_json(session, FRANK_URL, payload)
+        if response.get("errors") and offset == 0:
+            # Voor gisteren/morgen is 'nog niet gepubliceerd' normaal; voor vandaag niet.
+            raise SourceError(f"Frank: {response['errors'][0].get('message')}")
+        data = response.get("data") or {}
         prices = data.get("marketPrices") or {}
         rows_per_energy[ELECTRICITY].extend(prices.get("electricityPrices") or [])
         rows_per_energy[GAS].extend(prices.get("gasPrices") or [])
@@ -259,7 +276,7 @@ async def fetch_frank(session: aiohttp.ClientSession) -> PriceData:
         for r in rows_per_energy[energy]:
             market_ex = float(r["marketPrice"])
             market = round(market_ex + float(r.get("marketPriceTax") or 0.0), 6)
-            factor = market / market_ex if market_ex else 1.21
+            factor = _VAT_FACTOR  # vast; zie fetch_easyenergy
             # sourcingMarkupPrice (opslag) is AL incl. btw — net als energyTaxPrice;
             # alleen marketPrice heeft een aparte btw-regel (marketPriceTax).
             fee = float(r.get("sourcingMarkupPrice") or 0.0)
@@ -293,8 +310,12 @@ async def fetch_energyzero(session: aiohttp.ClientSession) -> PriceData:
     """EnergyZero levert alleen de kale marktprijs; energiebelasting via NL-default,
     geen leverancier-opslag. Voor exacte opslag: gebruik CUSTOM."""
     now = dt_util.now()
-    from_date = (now - timedelta(days=1)).strftime("%Y-%m-%dT00:00:00.000Z")
-    till_date = (now + timedelta(days=1)).strftime("%Y-%m-%dT23:59:59.999Z")
+    # Lokale middernacht (gisteren) t/m einde van morgen, als UTC. Met '...T00:00Z' op een
+    # lokale datum miste het eerste uur van gisteren (twee in de zomer).
+    start = dt_util.as_utc(dt_util.start_of_local_day((now - timedelta(days=1)).date()))
+    end = dt_util.as_utc(dt_util.start_of_local_day((now + timedelta(days=2)).date()))
+    from_date = start.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    till_date = (end - timedelta(milliseconds=1)).strftime("%Y-%m-%dT%H:%M:%S.999Z")
 
     result: PriceData = {}
     per_energy = (

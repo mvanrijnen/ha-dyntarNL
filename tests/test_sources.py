@@ -140,3 +140,39 @@ def test_frank_new_api_shape(monkeypatch, load_fixture, at_time):
     first = min(slots, key=lambda s: s.start)  # 2026-11-15T23:00Z = 00:00 lokaal
     assert first.market_ex == pytest.approx(0.13552)
     assert first.total == pytest.approx(0.13552 + 0.02846 + 0.01815 + 0.11085, abs=1e-5)
+
+
+def test_easyenergy_gas_is_fetched_per_hour(monkeypatch, load_fixture):
+    """'day' gaf kalenderdaggemiddelden (00–00) i.p.v. de gasdag (06–06)."""
+    calls = []
+
+    async def fake_get(session, url, **kw):
+        calls.append(kw["params"])
+        return load_fixture("easyenergy_electricity.json") if kw["params"]["type"] == "electricity" else load_fixture("easyenergy_gas.json")
+
+    monkeypatch.setattr(src, "_get_json", fake_get)
+    _run(src.fetch_easyenergy(None))
+    assert {(c["type"], c["granularity"]) for c in calls} == {("electricity", "hour"), ("gas", "hour")}
+
+
+def test_frank_error_for_today_is_not_silently_ignored(monkeypatch):
+    async def fake_post(session, url, body):
+        return {"data": None, "errors": [{"message": "Graphql validation error"}]}
+
+    monkeypatch.setattr(src, "_post_json", fake_post)
+    with pytest.raises(src.SourceError, match="validation"):
+        _run(src.fetch_frank(None))
+
+
+def test_energyzero_window_starts_at_local_midnight(monkeypatch, load_fixture):
+    calls = []
+
+    async def fake_get(session, url, **kw):
+        calls.append(kw["params"])
+        return load_fixture("energyzero_electricity.json")
+
+    monkeypatch.setattr(src, "_get_json", fake_get)
+    _run(src.fetch_energyzero(None))
+    # 'nu' = 17-08 14:00 +02:00 → gisteren 00:00 lokaal = 15-08 22:00Z; t/m morgen 24:00 lokaal
+    assert calls[0]["fromDate"] == "2026-08-15T22:00:00.000Z"
+    assert calls[0]["tillDate"] == "2026-08-18T21:59:59.999Z"
