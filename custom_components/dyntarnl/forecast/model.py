@@ -27,6 +27,14 @@ from ..const import (
     WEIGHTING_ACCURACY,
 )
 
+
+
+def _known_providers(keys) -> tuple[str, ...]:
+    """Alleen geregistreerde bronnen (een verwijderde/onbekende key in de opties negeren)."""
+    from .providers import PROVIDERS  # lazy: providers importeert dit model
+
+    return tuple(k for k in (keys or ()) if k in PROVIDERS)
+
 QUARTER = timedelta(minutes=15)
 SOURCE_PUBLISHED = "published"
 SOURCE_FORECAST = "forecast"
@@ -138,7 +146,7 @@ class ForecastConfig:
         o = {**FORECAST_DEFAULTS, **(options or {})}
         return cls(
             enabled=bool(o[CONF_FORECAST]),
-            providers=tuple(o[CONF_FC_PROVIDERS] or ()),
+            providers=_known_providers(o[CONF_FC_PROVIDERS]),
             ensemble=bool(o[CONF_FC_ENSEMBLE]),
             weighting=str(o[CONF_FC_WEIGHTING]),
             weight_exponent=int(o[CONF_FC_WEIGHT_EXPONENT]),

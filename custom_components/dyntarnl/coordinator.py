@@ -123,7 +123,9 @@ class DynTarNLCoordinator(DataUpdateCoordinator[PriceData]):
             elif supplier.platform == PLATFORM_ENERGYZERO:
                 data = await fetch_energyzero(self._session)
             elif supplier.platform == PLATFORM_CUSTOM:
-                cfg = {**self.config_entry.data, **self.config_entry.options}
+                # Tarieven staan in data (reconfigure schrijft daar); data wint, zodat een oude
+                # waarde in options een gewijzigd tarief nooit kan overschrijven.
+                cfg = {**self.config_entry.options, **self.config_entry.data}
                 data = await build_custom(self._session, cfg)
             else:
                 raise UpdateFailed(

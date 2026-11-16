@@ -341,3 +341,13 @@ def test_weight_floor_with_three_sources_never_goes_negative():
     weights = apply_floor({"a": 0.8, "b": 0.1, "c": 0.1}, 0.5)
     assert all(w >= 0 for w in weights.values())
     assert sum(weights.values()) == pytest.approx(1)
+
+
+def test_unknown_provider_in_options_is_ignored():
+    """Een niet-geregistreerde bron in de opties mag get_prices niet laten 'slagen' met
+    alleen gepubliceerde data; hij telt gewoon niet mee."""
+    from dyntarnl.const import FORECAST_DEFAULTS
+    from dyntarnl.forecast.model import ForecastConfig
+
+    opts = {**FORECAST_DEFAULTS, "forecast_providers": ["epexpredictor", "bogus"]}
+    assert ForecastConfig.from_options(opts).providers == ("epexpredictor",)

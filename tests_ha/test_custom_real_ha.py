@@ -271,3 +271,43 @@ async def test_reconfigure_while_supplier_is_down_reloads_immediately(hass, aioc
     await hass.async_block_till_done()
     assert entry.state is ConfigEntryState.LOADED
     assert hass.states.get("sensor.dyntarnl_e_all_in_now").state not in ("unknown", "unavailable")
+
+
+async def test_reconfigure_during_slow_setup_is_applied(hass, aioclient_mock, freezer):
+    """Trage eerste fetch (HA-start) en intussen overstappen: moet na de setup gelden,
+    niet pas na de volgende herstart (de listener bestond toen nog niet)."""
+    import asyncio
+
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMockResponse
+
+    await hass.config.async_set_time_zone("Europe/Amsterdam")
+    freezer.move_to("2026-08-17T12:00:00+00:00")
+    gate, entered = asyncio.Event(), asyncio.Event()
+    essent = json.loads((FIX / "essent.json").read_text(encoding="utf-8"))
+
+    async def slow(method, url, data):
+        entered.set()
+        await gate.wait()
+        return AiohttpClientMockResponse(method, url, json=essent)
+
+    aioclient_mock.get(ESSENT, side_effect=slow)
+    for kind in ("electricity", "gas"):
+        aioclient_mock.get(
+            f"{EASY}?type={kind}",
+            json=json.loads((FIX / f"easyenergy_{kind}.json").read_text(encoding="utf-8")),
+        )
+    entry = MockConfigEntry(domain=DOMAIN, data={"supplier": "essent"}, version=1, minor_version=2)
+    entry.add_to_hass(hass)
+    setup = hass.async_create_task(hass.config_entries.async_setup(entry.entry_id))
+    await asyncio.wait_for(entered.wait(), 5)
+    assert entry.state is ConfigEntryState.SETUP_IN_PROGRESS
+
+    result = await _reconfigure(hass, entry)
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"supplier": "easyenergy"})
+    assert result["reason"] == "reconfigure_successful"
+    gate.set()
+    await setup
+    await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.LOADED
+    assert entry.runtime_data.supplier.key == "easyenergy"

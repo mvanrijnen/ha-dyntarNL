@@ -198,6 +198,10 @@ async def _async_options_updated(hass: HomeAssistant, entry: DynTarNLConfigEntry
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -> bool:
+    # Listener vóór de eerste fetch: een reconfigure/opties-wijziging tijdens een trage setup
+    # (HA-start) werd anders geaccepteerd maar pas bij de volgende herstart toegepast. Bij
+    # ConfigEntryNotReady ruimt HA hem via de on-unload-callbacks weer op.
+    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     coordinator = DynTarNLCoordinator(hass, entry)
     # Ophalen bij opstarten.
     await coordinator.async_config_entry_first_refresh()
@@ -211,7 +215,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -> 
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     _register_services(hass)
-    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
 
     @callback
     def _fetch(_now=None) -> None:
