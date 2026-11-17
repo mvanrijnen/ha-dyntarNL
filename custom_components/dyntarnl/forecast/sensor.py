@@ -85,7 +85,7 @@ def _avg_attrs(c: Coord) -> dict | None:
     merged = _merged(c)
     info = _clean(next_24h(merged, dt_util.utcnow()), drop=("avg_price_allin",)) or {}
     prices = chart_series(merged)
-    forecast, forecast_market, band = forecast_chart(
+    forecast, forecast_market, band, forecast_export = forecast_chart(
         merged, c.data.tariff if c.data else None, chart_step(merged)
     )
     forecasts = [r for r in merged if r.source != "published"]
@@ -95,6 +95,7 @@ def _avg_attrs(c: Coord) -> dict | None:
             "error_band": band,
             "forecast": forecast,
             "forecast_market": forecast_market,
+            "forecast_export": forecast_export,
             "forecast_until": dt_util.as_local(forecasts[-1].end).isoformat() if forecasts else None,
         }
     )
@@ -326,7 +327,9 @@ class DynTarNLForecastSensor(CoordinatorEntity[DynTarNLForecastCoordinator], Sen
 class DynTarNLForecastChartSensor(DynTarNLForecastSensor):
     """Draagt de volledige reeks; die gaat NIET de recorder in."""
 
-    _unrecorded_attributes = frozenset({"prices", "error_band", "forecast", "forecast_market"})
+    _unrecorded_attributes = frozenset(
+        {"prices", "error_band", "forecast", "forecast_market", "forecast_export"}
+    )
 
 
 def forecast_entities(coordinator: Coord) -> list[SensorEntity]:

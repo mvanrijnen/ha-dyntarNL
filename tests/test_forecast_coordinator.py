@@ -405,3 +405,20 @@ def test_tomorrow_forecast_is_kept_until_the_supplier_publishes(at_time):
     assert TOMORROW + timedelta(days=1) in starts  # nieuwe reeks erbij
     tomorrow_rows = [r for r in fc.data.merged if TOMORROW <= r.start < TOMORROW + timedelta(days=1)]
     assert len(tomorrow_rows) == 96
+
+
+def test_forecast_avg_sensor_exposes_forecast_export():
+    """forecast_export naast forecast_market: zelfde tijdstempels, niet in de recorder."""
+    from dyntarnl.forecast.sensor import DynTarNLForecastChartSensor, _avg_attrs
+
+    assert "forecast_export" in DynTarNLForecastChartSensor._unrecorded_attributes
+    fc, _ = _make()
+    _stub(fc, A, _points(0.10, hours=48), [])
+    _stub(fc, B, _points(0.12, hours=48), [])
+    asyncio.run(fc.async_tick())
+    attrs = _avg_attrs(fc)
+    assert attrs["forecast_export"]
+    assert [ms for ms, _ in attrs["forecast_export"]] == [ms for ms, _ in attrs["forecast_market"]]
+    fee = fc.data.tariff.fee_ex * (1 + fc.data.tariff.vat / 100)
+    for (_, m), (_, e) in zip(attrs["forecast_market"], attrs["forecast_export"]):
+        assert e == pytest.approx(m - fee, abs=1e-5)

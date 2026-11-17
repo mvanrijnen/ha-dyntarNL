@@ -77,6 +77,15 @@ async def test_custom_supplier_can_be_set_up_and_used(hass, prices):
     assert allin.attributes["unit_of_measurement"] == "€/kWh"
     assert len(allin.attributes["today"]) == 24
 
+    # Terugleverprijs als reeks: beurs − opslag, zelfde attributen als market_now.
+    export = hass.states.get("sensor.dyntarnl_e_export_price_now")
+    assert float(export.state) == pytest.approx((market_ex - 0.02) * 1.21, abs=1e-5)
+    assert len(export.attributes["prices"]) == len(market.attributes["prices"])
+    for (ms_e, p_e), (ms_m, p_m) in zip(export.attributes["prices"], market.attributes["prices"]):
+        assert ms_e == ms_m and p_e == pytest.approx(p_m - 0.02 * 1.21, abs=2e-5)
+    assert len(export.attributes["today"]) == 24
+    assert export.attributes["purchase_fee"] == pytest.approx(0.02 * 1.21, abs=1e-5)
+
     gas = hass.states.get("sensor.dyntarnl_g_all_in_now")
     assert gas is not None and gas.state not in ("unknown", "unavailable")
 

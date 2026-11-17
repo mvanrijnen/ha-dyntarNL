@@ -8,7 +8,7 @@ from homeassistant.util import dt as dt_util
 
 from ..const import ELECTRICITY, ENSEMBLE
 from ..model import PriceData
-from ..prices import Tariff, apply_formula
+from ..prices import Tariff, apply_formula, feed_in_value
 from .engine import ForecastData, merge, primary_series, published_records
 from .model import QUARTER, SOURCE_PUBLISHED, ForecastConfig, QuarterRecord, floor_quarter
 
@@ -118,9 +118,10 @@ def chart_step(records: list[QuarterRecord]) -> timedelta:
 
 def forecast_chart(
     records: list[QuarterRecord], tariff: Tariff | None, step: timedelta = timedelta(hours=1)
-) -> tuple[list, list, list]:
+) -> tuple[list, list, list, list]:
     """Alleen de voorspelde tijdvakken, als grafiekreeksen naast de bestaande kaart:
-    all-in [[ms, prijs]], beurs incl. btw [[ms, prijs]] en foutband [[ms, laag, hoog]].
+    all-in [[ms, prijs]], beurs incl. btw [[ms, prijs]], foutband [[ms, laag, hoog]] en
+    teruglevering (beurs − opslag, feed_in_value) [[ms, prijs]].
 
     Gemiddeld per `step` (standaard per uur, net als de gepubliceerde kolommen):
     ApexCharts baseert de kolombreedte op het kleinste tijdsverschil over álle series,
@@ -128,7 +129,7 @@ def forecast_chart(
     komen uit dezelfde apply_formula, toegepast op de gemiddelde kale prijs.
     """
     if tariff is None:
-        return [], [], []
+        return [], [], [], []
     size = int(step.total_seconds())
     groups: dict[int, list[QuarterRecord]] = {}
     for r in records:
@@ -137,7 +138,7 @@ def forecast_chart(
         ts = int(r.start.timestamp())
         groups.setdefault(ts - ts % size, []).append(r)
 
-    allin, market, band = [], [], []
+    allin, market, band, export = [], [], [], []
     for ts in sorted(groups):
         group = groups[ts]
         if len(group) < size // int(QUARTER.total_seconds()):
@@ -147,11 +148,12 @@ def forecast_chart(
         ms = ts * 1000
         allin.append([ms, round(slot.total, 5)])
         market.append([ms, round(slot.market, 5)])
+        export.append([ms, round(feed_in_value(slot), 5)])
         errors = [r.expected_error_allin for r in group if r.expected_error_allin is not None]
         if errors:
             err = sum(errors) / len(errors)
             band.append([ms, round(slot.total - err, 5), round(slot.total + err, 5)])
-    return allin, market, band
+    return allin, market, band, export
 
 
 def service_response(

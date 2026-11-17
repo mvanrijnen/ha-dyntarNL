@@ -141,3 +141,26 @@ def test_prices_array_matches_day_arrays():
     attrs = _attributes(ed, NOW, lambda s: s.total)
     from_days = [e["price"] for e in attrs["today"] + attrs["tomorrow"]]
     assert [v for _, v in attrs["prices"]] == from_days
+
+
+def test_export_price_now_carries_the_feed_in_series():
+    """export price now: zelfde attributen als market_now, maar prijs = beurs − opslag."""
+    from dyntarnl.prices import feed_in_value
+    from dyntarnl.sensor import _FEEDIN_SENSORS, DynTarNLFeedInSensor
+
+    desc = next(d for d in _FEEDIN_SENSORS if d.key == "feedin_compensation_now")
+    assert desc.attr_fn is _attributes and desc.attr_price is feed_in_value
+    # De andere teruglever-sensoren houden geen attributen.
+    assert all(d.attr_fn is None for d in _FEEDIN_SENSORS if d is not desc)
+    assert {"yesterday", "today", "tomorrow", "prices"} <= DynTarNLFeedInSensor._unrecorded_attributes
+
+    ed = _energy([_slot(h, m) for h, m in ((11, 0.10), (12, 0.01), (13, -0.05))])
+    attrs = desc.attr_fn(ed, NOW, desc.attr_price)
+    expected = [0.10 - 0.025, 0.01 - 0.025, -0.05 - 0.025]
+    assert [p for _, p in attrs["prices"]] == [round(v, 5) for v in expected]
+    assert [r["price"] for r in attrs["today"]] == [round(v, 5) for v in expected]
+    assert attrs["prices"][2][1] < 0  # terugleveren kost geld
+    assert attrs["prices"][0][0] == int(datetime(2026, 8, 17, 11, tzinfo=AMS).timestamp() * 1000)
+    for key in ("unit", "vat_percentage", "market_price", "purchase_fee", "energy_tax"):
+        assert key in attrs
+    assert attrs["market_price"] == 0.01 and attrs["purchase_fee"] == 0.025

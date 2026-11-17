@@ -3,6 +3,22 @@
 Alle noemenswaardige wijzigingen. Versies volgen [semver](https://semver.org/lang/nl/);
 oudere versies staan op de [releases-pagina](https://github.com/mvanrijnen/ha-dyntarNL/releases).
 
+## 1.2.0
+
+### Nieuw: terugleverprijs als reeks
+
+- `sensor.dyntarnl_e_export_price_now` heeft nu dezelfde attributen als `..._market_now`:
+  `unit`, `vat_percentage`, `yesterday`, `today`, `tomorrow`, `prices` ([epoch-ms, prijs]),
+  `market_price`, `purchase_fee` en `energy_tax`. De prijs in de reeksen is de
+  terugleverprijs: beurs − opslag (kan negatief).
+- `sensor.dyntarnl_e_all_in_forecast_avg` heeft het attribuut `forecast_export`: de
+  voorspelde terugleverprijs per uur, met dezelfde tijdstempels als `forecast_market`.
+- Dashboards (ApexCharts, Markdown-tabel) en andere integraties kunnen hier direct mee
+  rekenen; de voorbeeldkaarten in de README tonen de teruglevering.
+
+Er breekt niets: entity-ids en bestaande attributen blijven gelijk, en de grote reeksen gaan
+niet de recorder in.
+
 ## 1.1.1
 
 Bugfix-release: resultaat van een uitgebreide bughunt. Geen gewijzigde entiteiten of

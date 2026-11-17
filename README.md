@@ -95,7 +95,7 @@ Bijv. `sensor.dyntarnl_e_all_in_now`, `sensor.dyntarnl_g_market_today_avg`.
 
 | entity_id | Waarde |
 | --- | --- |
-| `sensor.dyntarnl_e_export_price_now` | €/kWh voor export dit uur (kan negatief) |
+| `sensor.dyntarnl_e_export_price_now` | €/kWh voor export dit uur: beurs − opslag (kan negatief). Attributen als bij `..._market_now`: `unit`, `vat_percentage`, `yesterday`, `today`, `tomorrow`, `prices` ([epoch-ms, prijs], gisteren t/m morgen), `market_price`, `purchase_fee`, `energy_tax` |
 | `sensor.dyntarnl_e_export_cost_now` / `_export_cost_next` | €/kWh die export kost (0 = kost niets) |
 | `sensor.dyntarnl_e_neg_hours_today` | aantal uren met beursprijs < 0 |
 | `sensor.dyntarnl_e_export_loss_today` | aantal uren dat export geld kost |
@@ -240,9 +240,23 @@ series:
       in_header: before_now
     data_generator: |
       return entity.attributes.prices;
+  - entity: sensor.dyntarnl_e_export_price_now
+    name: teruglevering
+    type: line
+    curve: stepline
+    stroke_width: 2
+    color: "#8e24aa"
+    extend_to: false
+    float_precision: 3
+    unit: " €/kWh"
+    show:
+      in_header: before_now
+    data_generator: |
+      return entity.attributes.prices;
 ```
 
-Het verschil tussen de lijn en de kolommen is precies je opslag + energiebelasting.
+Het verschil tussen de lijn en de kolommen is precies je opslag + energiebelasting. De paarse
+lijn is wat je voor teruglevering krijgt (beurs − opslag); onder nul kost terugleveren geld.
 
 **Alleen de beurs?** Laat de eerste serie weg en zet de drempels lager — beursprijzen liggen
 een stuk dichter bij nul en duiken er regelmatig onder:
@@ -433,12 +447,14 @@ Zet je de optie uit (of een bron), dan worden de bijbehorende entiteiten automat
 
 ### Voorspelling in de grafiek
 
-De sensor `sensor.dyntarnl_e_all_in_forecast_avg` heeft twee kant-en-klare reeksen met **alleen
+De sensor `sensor.dyntarnl_e_all_in_forecast_avg` heeft drie kant-en-klare reeksen met **alleen
 de voorspelde uren** (per uur, net als de kolommen; anders tekent ApexCharts alle kolommen vier
 keer zo smal):
 
 - `forecast`: de all-in prijs;
-- `forecast_market`: de beursprijs incl. btw, net als de reeks van `..._market_now`.
+- `forecast_market`: de beursprijs incl. btw, net als de reeks van `..._market_now`;
+- `forecast_export`: de terugleverprijs (beurs − opslag incl. btw), net als de reeks van
+  `..._export_price_now`.
 
 Je kunt ze dus naast de bestaande voorbeeldkaart zetten. Gepubliceerde uren blijven
 kolommen. De voorspelling wordt een **gestippelde stepline met een lichte vulling**, in
@@ -463,7 +479,7 @@ twee series verdelen, en alle kolommen worden half zo smal.
 Neem de [voorbeeldkaart](#voorbeeld-kaart-all-in-én-beurs-in-één-grafiek) en pas twee dingen aan:
 
 1. `graph_span: 120h`: gisteren + vandaag + drie dagen vooruit.
-2. Zet de volgende twee series onder `series:`:
+2. Zet de volgende drie series onder `series:`:
 
 ```yaml
   - entity: sensor.dyntarnl_e_all_in_forecast_avg
@@ -503,6 +519,20 @@ Neem de [voorbeeldkaart](#voorbeeld-kaart-all-in-én-beurs-in-één-grafiek) en 
       in_header: false
     data_generator: |
       return entity.attributes.forecast_market || [];
+  - entity: sensor.dyntarnl_e_all_in_forecast_avg
+    name: teruglevering (voorspeld)
+    type: line
+    curve: stepline
+    stroke_width: 2
+    stroke_dash: 4
+    color: "#8e24aa"
+    extend_to: false
+    float_precision: 3
+    unit: " €/kWh"
+    show:
+      in_header: false
+    data_generator: |
+      return entity.attributes.forecast_export || [];
 ```
 
 Wil je ook de onzekerheid zien? `error_band` geeft per voorspeld uur
@@ -567,11 +597,14 @@ content: |
   {%- set nu = now().timestamp() -%}
   {%- set a_now = 'sensor.dyntarnl_e_all_in_now' -%}
   {%- set m_now = 'sensor.dyntarnl_e_market_now' -%}
+  {%- set x_now = 'sensor.dyntarnl_e_export_price_now' -%}
   {%- set fc_ent = 'sensor.dyntarnl_e_all_in_forecast_avg' -%}
   {%- set allin = (state_attr(a_now, 'today') or []) + (state_attr(a_now, 'tomorrow') or []) -%}
   {%- set beurs = (state_attr(m_now, 'today') or []) + (state_attr(m_now, 'tomorrow') or []) -%}
+  {%- set terug = (state_attr(x_now, 'today') or []) + (state_attr(x_now, 'tomorrow') or []) -%}
   {%- set fc = state_attr(fc_ent, 'forecast') or [] -%}
   {%- set fm = state_attr(fc_ent, 'forecast_market') or [] -%}
+  {%- set fx = state_attr(fc_ent, 'forecast_export') or [] -%}
   {%- set eb = state_attr(fc_ent, 'error_band') or [] -%}
   {%- set ns = namespace(rows=[], marge={}) -%}
   {%- for e in eb -%}
@@ -580,12 +613,14 @@ content: |
   {%- for p in allin -%}
     {%- set t = as_timestamp(p.start) -%}
     {%- set b = beurs[loop.index0].price if beurs | length > loop.index0 else none -%}
-    {%- set ns.rows = ns.rows + [{'t': t, 'd': t | timestamp_custom('%Y-%m-%d'), 'a': p.price, 'b': b, 'f': false, 'm': none}] -%}
+    {%- set x = terug[loop.index0].price if terug | length > loop.index0 else none -%}
+    {%- set ns.rows = ns.rows + [{'t': t, 'd': t | timestamp_custom('%Y-%m-%d'), 'a': p.price, 'b': b, 'x': x, 'f': false, 'm': none}] -%}
   {%- endfor -%}
   {%- for p in fc -%}
     {%- set t = p[0] / 1000 -%}
     {%- set b = fm[loop.index0][1] if fm | length > loop.index0 else none -%}
-    {%- set ns.rows = ns.rows + [{'t': t, 'd': t | timestamp_custom('%Y-%m-%d'), 'a': p[1], 'b': b, 'f': true, 'm': ns.marge.get(p[0] | string)}] -%}
+    {%- set x = fx[loop.index0][1] if fx | length > loop.index0 else none -%}
+    {%- set ns.rows = ns.rows + [{'t': t, 'd': t | timestamp_custom('%Y-%m-%d'), 'a': p[1], 'b': b, 'x': x, 'f': true, 'm': ns.marge.get(p[0] | string)}] -%}
   {%- endfor -%}
   {%- macro eur(x) -%}{{ '%.3f' | format(x) | replace('.', ',') }}{%- endmacro -%}
   {%- macro dag(ts) -%}{{ ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'][ts | timestamp_custom('%w') | int] }}{%- endmacro -%}
@@ -602,14 +637,15 @@ content: |
   {% endfor %}
   ### Per uur (komende {{ uren }} uur)
 
-  | Tijd | All-in | Beurs | Bron |
-  |:--|--:|--:|:--|
+  | Tijd | All-in | Beurs | Terug | Bron |
+  |:--|--:|--:|--:|:--|
   {% for r in ns.rows if r.t + 3600 > nu and r.t < nu + uren * 3600 -%}
-  | {{ dag(r.t) }} {{ r.t | timestamp_custom('%H:%M') }} | {{ kleur(r.a) }} {{ eur(r.a) }} | {{ eur(r.b) if r.b is not none else '–' }} | {{ ('≈ voorspeld' ~ (' ±' ~ eur(r.m) if r.m is not none else '')) if r.f else 'gepubliceerd' }} |
+  | {{ dag(r.t) }} {{ r.t | timestamp_custom('%H:%M') }} | {{ kleur(r.a) }} {{ eur(r.a) }} | {{ eur(r.b) if r.b is not none else '–' }} | {{ eur(r.x) if r.x is not none else '–' }} | {{ ('≈ voorspeld' ~ (' ±' ~ eur(r.m) if r.m is not none else '')) if r.f else 'gepubliceerd' }} |
   {% endfor %}
 ```
 
-🟢 is onder € 0,25, 🟡 tot € 0,40 en 🔴 daarboven: dezelfde drempels als de grafiek. Wil je een
+🟢 is onder € 0,25, 🟡 tot € 0,40 en 🔴 daarboven: dezelfde drempels als de grafiek. *Terug* is
+de terugleverprijs (beurs − opslag); negatief betekent dat terugleveren geld kost. Wil je een
 kortere of langere uurtabel, pas dan `uren` op de eerste regel aan.
 
 ### Service `dyntarnl.get_prices`

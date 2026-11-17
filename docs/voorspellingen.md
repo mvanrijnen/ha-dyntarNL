@@ -192,7 +192,7 @@ de bijbehorende entiteiten en het device zelf op.
 | Entiteit | State | Belangrijkste attributen |
 | --- | --- | --- |
 | `sensor.dyntarnl_e_cheapest_block_start` | Start van het goedkoopste aaneengesloten blok van N uur in de komende 48 uur, inclusief voorspellingen. Begint altijd op een heel uur; dat mag het lopende uur zijn (dan blijft de start staan zolang het blok loopt) | `end`, `hours`, `avg_price_allin`, `avg_price_raw`, `source`, `providers`, `expected_error_allin` |
-| `sensor.dyntarnl_e_all_in_forecast_avg` | Gemiddelde all-in prijs komende 24 uur | `source`, `coverage_hours`, `forecast_until`, `prices` (alles per kwartier) en de grafiekreeksen `forecast`, `forecast_market`, `error_band` (alleen voorspeld, per uur) |
+| `sensor.dyntarnl_e_all_in_forecast_avg` | Gemiddelde all-in prijs komende 24 uur | `source`, `coverage_hours`, `forecast_until`, `prices` (alles per kwartier) en de grafiekreeksen `forecast` (all-in), `forecast_market` (beurs incl. btw), `forecast_export` (teruglevering: beurs − opslag incl. btw) en `error_band` (alleen voorspeld, per uur, [epoch-ms, prijs] resp. [epoch-ms, laag, hoog]) |
 | `sensor.dyntarnl_e_tomorrow_avg_forecast` | Gemiddelde all-in van morgen: gepubliceerd als dat er is, anders voorspeld. Alleen als de hele dag bekend is (bij een korte horizon dus soms leeg) | `date`, `source`, `coverage_hours`, `expected_error_allin` |
 
 `source` is `published`, `forecast` of `mixed` (een deel gepubliceerd, een deel voorspeld).
@@ -344,7 +344,7 @@ series) en pas twee dingen aan:
 ```
 
 **Kolombreedte.** ApexCharts maakt kolommen zo breed als het kleinste tijdsverschil tussen
-twee punten in de hele grafiek. Daarom staan `forecast`, `forecast_market` en `error_band` per
+twee punten in de hele grafiek. Daarom staan `forecast`, `forecast_market`, `forecast_export` en `error_band` per
 **uur**, net als de gepubliceerde kolommen (publiceert je leverancier per kwartier, dan per
 kwartier). De kwartierdetails blijven beschikbaar via `prices` en `dyntarnl.get_prices`. Hoe
 langer `graph_span`, hoe smaller de kolommen: 120 uur geeft ruim 40% smallere kolommen dan

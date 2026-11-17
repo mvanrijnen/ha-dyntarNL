@@ -111,7 +111,7 @@ def test_forecast_chart_is_hourly_like_the_columns():
     data, _ = _forecast([0.08, 0.10, 0.12, 0.14, 0.20, 0.20, 0.20, 0.20], [0.10] * 8)
     step = chart_step(data.merged)
     assert step == timedelta(hours=1)  # leverancier publiceert per uur
-    allin, market, band = forecast_chart(data.merged, data.tariff, step)
+    allin, market, band, _ = forecast_chart(data.merged, data.tariff, step)
     assert len(allin) == len(market) == len(band) == 2
     assert allin[1][0] - allin[0][0] == 3_600_000
     # eerste uur: ensemble per kwartier (0.09, 0.10, 0.11, 0.12) → gemiddeld 0.105 kaal
@@ -126,10 +126,10 @@ def test_forecast_chart_only_forecast_and_needs_tariff():
     from dyntarnl.forecast.views import forecast_chart
 
     data, _ = _forecast([0.10] * 8)
-    allin, _, _ = forecast_chart(data.merged, data.tariff)
+    allin, _, _, _ = forecast_chart(data.merged, data.tariff)
     published_end = max(r.end for r in data.merged if r.source == "published")
     assert all(ms >= published_end.timestamp() * 1000 for ms, _ in allin)
-    assert forecast_chart(data.merged, None) == ([], [], [])
+    assert forecast_chart(data.merged, None) == ([], [], [], [])
 
 
 def test_service_configured_provider_without_data_is_not_an_error():
@@ -163,7 +163,7 @@ def test_forecast_chart_drops_partial_hour_at_the_edge():
     from dyntarnl.forecast.views import forecast_chart
 
     data, _ = _forecast([0.10] * 4 + [0.50] * 2)  # tweede uur maar half voorspeld
-    allin, _, _ = forecast_chart(data.merged, data.tariff)
+    allin, _, _, _ = forecast_chart(data.merged, data.tariff)
     assert len(allin) == 1
 
 
@@ -185,3 +185,16 @@ def test_service_says_which_forecast_series_it_used():
     off = cfg(**{"forecast_ensemble": False})
     out = service_response(prices_data(), data, off, "Essent", ELECTRICITY, True, "ensemble", None, NOW)
     assert out["forecast_series"] == "first_available_provider"
+
+
+def test_forecast_export_is_market_minus_markup_incl_vat():
+    from dyntarnl.forecast.views import forecast_chart
+
+    data, _ = _forecast([0.08, 0.10, 0.12, 0.14, -0.20, -0.20, -0.20, -0.20], [0.10] * 8)
+    _, market, _, export = forecast_chart(data.merged, data.tariff)
+    assert export and [ms for ms, _ in export] == [ms for ms, _ in market]
+    markup = 0.02 * 1.21  # opslag incl. btw (tarief van de fixture)
+    for (_, m), (_, e) in zip(market, export):
+        assert e == pytest.approx(m - markup, abs=1e-5)
+    assert export[-1][1] < 0  # negatieve terugleverprijs mogelijk
+

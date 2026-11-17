@@ -240,10 +240,13 @@ def _feedin_cost_hours_today(data: EnergyData, now: datetime) -> float:
 class DynTarNLFeedInDescription(SensorEntityDescription):
     compute: FeedInFn
     is_hours: bool = False
+    # Optionele attributen, zelfde vorm als bij de prijssensoren, met attr_price als prijs.
+    attr_fn: AttrFn | None = None
+    attr_price: PriceFn = feed_in_value
 
 
 _FEEDIN_SENSORS: tuple[DynTarNLFeedInDescription, ...] = (
-    DynTarNLFeedInDescription(key="feedin_compensation_now", name="export price now", icon="mdi:transmission-tower-export", suggested_display_precision=5, compute=_feedin_compensation),
+    DynTarNLFeedInDescription(key="feedin_compensation_now", name="export price now", icon="mdi:transmission-tower-export", suggested_display_precision=5, compute=_feedin_compensation, attr_fn=_attributes),
     DynTarNLFeedInDescription(key="feedin_cost_now", name="export cost now", icon="mdi:cash-minus", suggested_display_precision=5, compute=_feedin_cost_now),
     DynTarNLFeedInDescription(key="feedin_cost_next_hour", name="export cost next", icon="mdi:cash-minus", suggested_display_precision=5, compute=_feedin_cost_next),
     DynTarNLFeedInDescription(key="negative_hours_today", name="neg hours today", icon="mdi:counter", suggested_display_precision=0, compute=_negative_hours_today, is_hours=True),
@@ -254,6 +257,8 @@ _FEEDIN_SENSORS: tuple[DynTarNLFeedInDescription, ...] = (
 class DynTarNLFeedInSensor(DynTarNLEntity, SensorEntity):
     entity_description: DynTarNLFeedInDescription
     _attr_state_class = SensorStateClass.MEASUREMENT
+    # Alleen export price now heeft deze (grote, elk uur wisselende) reeksen.
+    _unrecorded_attributes = frozenset({"yesterday", "today", "tomorrow", "prices"})
 
     def __init__(self, coordinator, description) -> None:
         super().__init__(coordinator, ELECTRICITY)
@@ -276,6 +281,15 @@ class DynTarNLFeedInSensor(DynTarNLEntity, SensorEntity):
         if value is None:
             return None
         return round(value, 0 if self.entity_description.is_hours else PRICE_PRECISION)
+
+    @property
+    def extra_state_attributes(self) -> dict | None:
+        """Terugleverreeks (beurs − opslag) per uur, gisteren t/m morgen."""
+        data = self._data
+        description = self.entity_description
+        if data is None or description.attr_fn is None:
+            return None
+        return description.attr_fn(data, dt_util.now(), description.attr_price)
 
 
 async def async_setup_entry(
