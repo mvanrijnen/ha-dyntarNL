@@ -13,6 +13,9 @@ Je kiest je leverancier; de integratie bepaalt zelf het platform en de publieke 
 ## Sensoren
 Prijs-sensoren (all-in & beurs) voor stroom en gas, component-sensoren (belasting/opslag),
 en teruglever-/negatieve-prijs binary sensors om direct op te schakelen (ZeroExport / accu).
+De terugleverprijs (beurs − opslag) staat ook als reeks in de attributen van
+`sensor.dyntarnl_e_export_price_now` (gepubliceerd) en, met voorspellingen aan, als
+`forecast_export` op `sensor.dyntarnl_e_all_in_forecast_avg`.
 
 ## Optioneel: prijsvoorspellingen (vanaf 1.1)
 Standaard uit. Aan te zetten via *Configureren*. DynTarNL voorspelt zelf niets: het leest

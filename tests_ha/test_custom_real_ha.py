@@ -320,3 +320,23 @@ async def test_reconfigure_during_slow_setup_is_applied(hass, aioclient_mock, fr
     await hass.async_block_till_done()
     assert entry.state is ConfigEntryState.LOADED
     assert entry.runtime_data.supplier.key == "easyenergy"
+
+
+@pytest.mark.parametrize("doc", ["README.md", "docs/voorspellingen.md"])
+async def test_markdown_table_card_from_docs_renders(hass, prices, doc):
+    """De Markdown-kaart uit de docs moet in een echte HA renderen, met kolom Terug."""
+    import re
+
+    from homeassistant.helpers.template import Template
+
+    await _add_custom(hass)
+    text = (REPO / doc).read_text(encoding="utf-8")
+    block = re.search(r"```yaml\ntype: markdown\n.*?content: \|\n(.*?)```", text, re.S).group(1)
+    content = "\n".join(line[2:] if line.startswith("  ") else line for line in block.splitlines())
+    out = Template(content, hass).async_render(parse_result=False)
+    assert "| Tijd | All-in | Beurs | Terug | Bron |" in out
+    rows = [r for r in out.splitlines() if r.startswith("| ") and "gepubliceerd |" in r and ":" in r.split("|")[1]]
+    assert rows, out[:500]
+    # Kolom Terug = beurs − opslag incl. btw (0,02 × 1,21 ≈ 0,024).
+    beurs, terug = (float(c.strip().replace(",", ".")) for c in rows[0].split("|")[3:5])
+    assert terug == pytest.approx(beurs - 0.0242, abs=0.0015)

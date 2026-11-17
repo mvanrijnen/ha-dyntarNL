@@ -3,6 +3,12 @@
 Alle noemenswaardige wijzigingen. Versies volgen [semver](https://semver.org/lang/nl/);
 oudere versies staan op de [releases-pagina](https://github.com/mvanrijnen/ha-dyntarNL/releases).
 
+## 1.2.1
+
+Alleen documentatie: de grafiekkaart en de Markdown-tabel in `docs/voorspellingen.md` tonen
+nu ook de teruglevering (net als de README), en `info.md` noemt de terugleverreeks. Een test
+rendert de Markdown-kaarten uit de docs in een echte Home Assistant.
+
 ## 1.2.0
 
 ### Nieuw: terugleverprijs als reeks

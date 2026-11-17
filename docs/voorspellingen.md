@@ -301,7 +301,7 @@ Neem de voorbeeldkaart uit de README (met `in_header: before_now` op de twee gep
 series) en pas twee dingen aan:
 
 1. `graph_span: 120h` (gisteren + vandaag + drie dagen vooruit).
-2. Voeg onder `series:` deze twee series toe:
+2. Voeg onder `series:` deze drie series toe (all-in, beurs en teruglevering, voorspeld):
 
 ```yaml
   - entity: sensor.dyntarnl_e_all_in_forecast_avg
@@ -341,6 +341,20 @@ series) en pas twee dingen aan:
       in_header: false
     data_generator: |
       return entity.attributes.forecast_market || [];
+  - entity: sensor.dyntarnl_e_all_in_forecast_avg
+    name: teruglevering (voorspeld)
+    type: line
+    curve: stepline
+    stroke_width: 2
+    stroke_dash: 4
+    color: "#8e24aa"
+    extend_to: false
+    float_precision: 3
+    unit: " €/kWh"
+    show:
+      in_header: false
+    data_generator: |
+      return entity.attributes.forecast_export || [];
 ```
 
 **Kolombreedte.** ApexCharts maakt kolommen zo breed als het kleinste tijdsverschil tussen
@@ -407,10 +421,11 @@ voorspelde uren in twee tabellen:
 
 - **Per dag:** gemiddelde, laagste en hoogste all-in prijs, met de bron (`gepubliceerd`,
   `voorspeld` of `gemengd`). Vandaag telt de hele dag mee.
-- **Per uur:** de komende 48 uur, met all-in, beurs en de bron. Bij voorspelde uren staat
+- **Per uur:** de komende 48 uur, met all-in, beurs, teruglevering en de bron. Bij voorspelde uren staat
   ook de marge (± verwachte fout), zodra die bekend is.
 
-🟢 is onder € 0,25, 🟡 tot € 0,40 en 🔴 daarboven: dezelfde drempels als de grafiek. Pas
+🟢 is onder € 0,25, 🟡 tot € 0,40 en 🔴 daarboven: dezelfde drempels als de grafiek. *Terug* is
+de terugleverprijs (beurs − opslag); negatief betekent dat terugleveren geld kost. Pas
 `uren` bovenaan aan voor een kortere of langere uurtabel.
 
 ![Tabel per dag: gemiddelde, minimum, maximum en bron per dag](forecast-table-day.png)
@@ -439,11 +454,14 @@ content: |
   {%- set nu = now().timestamp() -%}
   {%- set a_now = 'sensor.dyntarnl_e_all_in_now' -%}
   {%- set m_now = 'sensor.dyntarnl_e_market_now' -%}
+  {%- set x_now = 'sensor.dyntarnl_e_export_price_now' -%}
   {%- set fc_ent = 'sensor.dyntarnl_e_all_in_forecast_avg' -%}
   {%- set allin = (state_attr(a_now, 'today') or []) + (state_attr(a_now, 'tomorrow') or []) -%}
   {%- set beurs = (state_attr(m_now, 'today') or []) + (state_attr(m_now, 'tomorrow') or []) -%}
+  {%- set terug = (state_attr(x_now, 'today') or []) + (state_attr(x_now, 'tomorrow') or []) -%}
   {%- set fc = state_attr(fc_ent, 'forecast') or [] -%}
   {%- set fm = state_attr(fc_ent, 'forecast_market') or [] -%}
+  {%- set fx = state_attr(fc_ent, 'forecast_export') or [] -%}
   {%- set eb = state_attr(fc_ent, 'error_band') or [] -%}
   {%- set ns = namespace(rows=[], marge={}) -%}
   {%- for e in eb -%}
@@ -452,12 +470,14 @@ content: |
   {%- for p in allin -%}
     {%- set t = as_timestamp(p.start) -%}
     {%- set b = beurs[loop.index0].price if beurs | length > loop.index0 else none -%}
-    {%- set ns.rows = ns.rows + [{'t': t, 'd': t | timestamp_custom('%Y-%m-%d'), 'a': p.price, 'b': b, 'f': false, 'm': none}] -%}
+    {%- set x = terug[loop.index0].price if terug | length > loop.index0 else none -%}
+    {%- set ns.rows = ns.rows + [{'t': t, 'd': t | timestamp_custom('%Y-%m-%d'), 'a': p.price, 'b': b, 'x': x, 'f': false, 'm': none}] -%}
   {%- endfor -%}
   {%- for p in fc -%}
     {%- set t = p[0] / 1000 -%}
     {%- set b = fm[loop.index0][1] if fm | length > loop.index0 else none -%}
-    {%- set ns.rows = ns.rows + [{'t': t, 'd': t | timestamp_custom('%Y-%m-%d'), 'a': p[1], 'b': b, 'f': true, 'm': ns.marge.get(p[0] | string)}] -%}
+    {%- set x = fx[loop.index0][1] if fx | length > loop.index0 else none -%}
+    {%- set ns.rows = ns.rows + [{'t': t, 'd': t | timestamp_custom('%Y-%m-%d'), 'a': p[1], 'b': b, 'x': x, 'f': true, 'm': ns.marge.get(p[0] | string)}] -%}
   {%- endfor -%}
   {%- macro eur(x) -%}{{ '%.3f' | format(x) | replace('.', ',') }}{%- endmacro -%}
   {%- macro dag(ts) -%}{{ ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'][ts | timestamp_custom('%w') | int] }}{%- endmacro -%}
@@ -474,10 +494,10 @@ content: |
   {% endfor %}
   ### Per uur (komende {{ uren }} uur)
 
-  | Tijd | All-in | Beurs | Bron |
-  |:--|--:|--:|:--|
+  | Tijd | All-in | Beurs | Terug | Bron |
+  |:--|--:|--:|--:|:--|
   {% for r in ns.rows if r.t + 3600 > nu and r.t < nu + uren * 3600 -%}
-  | {{ dag(r.t) }} {{ r.t | timestamp_custom('%H:%M') }} | {{ kleur(r.a) }} {{ eur(r.a) }} | {{ eur(r.b) if r.b is not none else '–' }} | {{ ('≈ voorspeld' ~ (' ±' ~ eur(r.m) if r.m is not none else '')) if r.f else 'gepubliceerd' }} |
+  | {{ dag(r.t) }} {{ r.t | timestamp_custom('%H:%M') }} | {{ kleur(r.a) }} {{ eur(r.a) }} | {{ eur(r.b) if r.b is not none else '–' }} | {{ eur(r.x) if r.x is not none else '–' }} | {{ ('≈ voorspeld' ~ (' ±' ~ eur(r.m) if r.m is not none else '')) if r.f else 'gepubliceerd' }} |
   {% endfor %}
 ```
 
@@ -529,7 +549,7 @@ de reden in `last_error`. Kijk ook in *Instellingen → Systeem → Logboeken* n
 `dyntarnl`.
 
 **Niets in de grafiek?**
-Controleer of de attributen `forecast` en `forecast_market` van
+Controleer of de attributen `forecast`, `forecast_market` en `forecast_export` van
 `sensor.dyntarnl_e_all_in_forecast_avg` gevuld zijn, en of `graph_span` ver genoeg vooruit
 reikt. De voorspelling begint pas na het laatste gepubliceerde uur.
 
