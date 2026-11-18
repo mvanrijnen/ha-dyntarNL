@@ -67,6 +67,30 @@ DEFAULT_VAT = 21.0
 DEFAULT_TAX_ELEC = 0.09161
 DEFAULT_TAX_GAS = 0.60066
 
+# --- Tariefperiodes (opties): één bron van waarheid voor tarieven per ingangsdatum ---
+# Elke periode geldt vanaf 00:00 (Europe/Amsterdam) op `start` tot de volgende periode.
+CONF_PERIODS = "tariff_periods"
+
+CONTRACT_DYNAMIC = "dynamic"
+CONTRACT_FIXED = "fixed"
+CONTRACT_VARIABLE = "variable"  # = vast, met tussentijdse wijzigingen als nieuwe periodes
+CONTRACTS = (CONTRACT_DYNAMIC, CONTRACT_FIXED, CONTRACT_VARIABLE)
+RATE_SINGLE = "single"
+RATE_DOUBLE = "double"          # normaal/dal
+RATE_INPUT_ALL_IN = "all_in"    # tarief incl. energiebelasting en btw
+RATE_INPUT_BARE = "bare"        # kaal leveringstarief excl. btw
+
+# Voorlopige waarden 2027 (gecorrigeerd Belastingplan 2027; definitief pas in december 2026).
+PROVISIONAL_2027_START = "2027-01-01"
+PROVISIONAL_TAX_ELEC_2027 = 0.08802   # = € 0,1065 incl. btw
+PROVISIONAL_TAX_GAS_2027 = 0.61628    # = € 0,7457 incl. btw
+# Wettelijk minimum terugleververgoeding 2027–2029: 50% van het kale leveringstarief.
+EXPORT_MINIMUM_SHARE = 0.5
+EXPORT_MINIMUM_FIRST_YEAR = 2027
+EXPORT_MINIMUM_LAST_YEAR = 2029
+# Waarschuw zoveel dagen vóór een periode ingaat als die nog voorlopig of onvolledig is.
+PERIOD_WARN_DAYS = 14
+
 # CUSTOM: bron voor de kale EPEX-beursprijs. Elk platform levert een beursprijs;
 # voor stroom is die identiek, voor gas verschilt 'ie licht per bron.
 CONF_EPEX_SOURCE = "epex_source"

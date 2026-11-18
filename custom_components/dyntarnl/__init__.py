@@ -7,14 +7,25 @@ import hashlib
 import voluptuous as vol
 
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse, callback
+from homeassistant.core import CoreState, HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse, callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, ELECTRICITY, ENSEMBLE, FC_MAX_HORIZON, FORECAST_DEFAULTS, GAS
+from .const import (
+    CONF_PERIODS,
+    CONF_SUPPLIER,
+    DOMAIN,
+    ELECTRICITY,
+    ENSEMBLE,
+    FC_MAX_HORIZON,
+    FORECAST_DEFAULTS,
+    GAS,
+    PLATFORM_CUSTOM,
+    supplier_by_key,
+)
 from .coordinator import DynTarNLConfigEntry, DynTarNLCoordinator
 from .forecast.accuracy import STORAGE_VERSION
 from .forecast.coordinator import DynTarNLForecastCoordinator, storage_key
@@ -22,6 +33,9 @@ from .forecast.model import ForecastConfig
 from .forecast.sensor import forecast_unique_ids, is_forecast_unique_id
 from .forecast.views import service_response
 from .model import tomorrow_complete
+from .issues import async_check_legacy_usage, async_update_issues
+from .tables import table
+from .tariffs import initial_periods
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.BUTTON]
 
@@ -60,6 +74,9 @@ GET_PRICES_SCHEMA = vol.Schema(
         vol.Optional("include_forecast", default=True): cv.boolean,
         vol.Optional("provider", default=ENSEMBLE): cv.string,
         vol.Optional("horizon"): vol.All(vol.Coerce(int), vol.Range(min=1, max=FC_MAX_HORIZON)),
+        # records = per kwartier (zoals sinds 1.1); table = de compacte inkoop- en
+        # verkooptabel, exact zoals de tabel-entiteiten.
+        vol.Optional("format", default="records"): vol.In(["records", "table"]),
     }
 )
 
@@ -101,6 +118,16 @@ def get_prices(hass: HomeAssistant, params: dict) -> dict:
     else:
         raise ServiceValidationError("DynTarNL is niet geladen")
     fc = coordinator.forecast
+    energy = params.get("energy", ELECTRICITY)
+    if params.get("format") == "table":
+        rows, step = coordinator.rows(energy)
+        ed = (coordinator.data or {}).get(energy)
+        unit = ed.unit if ed else "kWh"
+        name = coordinator.supplier.name if coordinator.supplier else ""
+        out = {"energy": energy, "buy": table(rows, step, "buy", unit, name)}
+        if energy == ELECTRICITY:
+            out["sell"] = table(rows, step, "sell", unit, name)
+        return out
     try:
         return service_response(
             coordinator.data,
@@ -112,13 +139,14 @@ def get_prices(hass: HomeAssistant, params: dict) -> dict:
             params.get("provider", ENSEMBLE),
             params.get("horizon"),
             dt_util.utcnow(),
+            coordinator.periods,
         )
     except ValueError as err:
         raise ServiceValidationError(str(err)) from err
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -> bool:
-    """1.1 → 1.2: voorspel-opties toevoegen met hun standaardwaarde (UIT).
+    """1.1 → 1.2: voorspel-opties (standaard UIT). 1.2 → 1.3: tariefperiodes.
 
     Alleen de minor-versie gaat omhoog, zodat terug naar 1.x zonder verwijderen kan:
     oudere code negeert de extra opties gewoon.
@@ -129,6 +157,13 @@ async def async_migrate_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -
         hass.config_entries.async_update_entry(
             entry, options={**FORECAST_DEFAULTS, **entry.options}, minor_version=2
         )
+    if entry.minor_version < 3:
+        options = dict(entry.options)
+        if not options.get(CONF_PERIODS):
+            supplier = supplier_by_key(entry.data.get(CONF_SUPPLIER, ""))
+            custom = supplier is not None and supplier.platform == PLATFORM_CUSTOM
+            options[CONF_PERIODS] = initial_periods(dict(entry.data), custom, dt_util.now().date())
+        hass.config_entries.async_update_entry(entry, options=options, minor_version=3)
     return True
 
 
@@ -215,6 +250,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -> 
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     _register_services(hass)
+    # Tariefperiodes: voorlopig/onvolledig of onder het wettelijk minimum → repair-melding.
+    async_update_issues(hass, coordinator.periods, coordinator.custom)
+    # Oude teruglever-entiteiten in gebruik? Pas na de start (automatiseringen geladen).
+    entry.async_on_unload(
+        hass.bus.async_listen_once(
+            "homeassistant_started", lambda _e: async_check_legacy_usage(hass, entry.entry_id)
+        )
+    )
+    if hass.state is CoreState.running:
+        async_check_legacy_usage(hass, entry.entry_id)
 
     @callback
     def _fetch(_now=None) -> None:
@@ -230,6 +275,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -> 
         alleen de sensoren laten meerollen — zónder netwerk-call."""
         if now.hour == 0:
             coordinator.async_rebucket()
+            async_update_issues(hass, coordinator.periods, coordinator.custom)
             _fetch()
         elif not coordinator.last_update_success:
             # Eerst uit de cache laten meerollen: na een tweede mislukte fetch stuurt HA geen

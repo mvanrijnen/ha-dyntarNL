@@ -33,7 +33,7 @@ def test_migration_adds_defaults_off_and_keeps_options():
     hass = Hass()
     entry = Entry(options={"vat_percentage": 9.0}, minor_version=1)
     assert asyncio.run(dyntarnl.async_migrate_entry(hass, entry)) is True
-    assert entry.minor_version == 2
+    assert entry.minor_version == 3  # 1.1 → 1.2 → 1.3 in één keer
     assert entry.options[CONF_FORECAST] is False
     assert entry.options["vat_percentage"] == 9.0  # bestaande opties blijven
     assert {k: entry.options[k] for k in FORECAST_DEFAULTS} == FORECAST_DEFAULTS
@@ -44,7 +44,7 @@ def test_migration_refuses_newer_major_version():
 
 
 def test_config_flow_is_minor_version_bump():
-    assert DynTarNLConfigFlow.VERSION == 1 and DynTarNLConfigFlow.MINOR_VERSION == 2
+    assert DynTarNLConfigFlow.VERSION == 1 and DynTarNLConfigFlow.MINOR_VERSION == 3
 
 
 def test_missing_options_mean_forecast_off():
@@ -96,7 +96,7 @@ def no_network(monkeypatch):
 
 def test_options_off_saves_immediately_and_keeps_rest():
     flow = _flow({**FORECAST_DEFAULTS, CONF_FC_PROVIDERS: [B]})
-    result = asyncio.run(flow.async_step_init({CONF_FORECAST: False}))
+    result = asyncio.run(flow.async_step_forecast_switch({CONF_FORECAST: False}))
     assert result["type"] == "create_entry"
     assert result["data"][CONF_FORECAST] is False
     assert result["data"][CONF_FC_PROVIDERS] == [B]
@@ -104,7 +104,7 @@ def test_options_off_saves_immediately_and_keeps_rest():
 
 def test_options_full_flow(no_network):
     flow = _flow()
-    assert asyncio.run(flow.async_step_init({CONF_FORECAST: True}))["step_id"] == "forecast"
+    assert asyncio.run(flow.async_step_forecast_switch({CONF_FORECAST: True}))["step_id"] == "forecast"
     assert asyncio.run(flow.async_step_forecast(_general()))["step_id"] == "provider_settings"
     result = asyncio.run(
         flow.async_step_provider_settings(
@@ -124,14 +124,14 @@ def test_options_full_flow(no_network):
 
 def test_options_require_a_provider():
     flow = _flow()
-    asyncio.run(flow.async_step_init({CONF_FORECAST: True}))
+    asyncio.run(flow.async_step_forecast_switch({CONF_FORECAST: True}))
     result = asyncio.run(flow.async_step_forecast(_general(**{CONF_FC_PROVIDERS: []})))
     assert result["errors"] == {CONF_FC_PROVIDERS: "no_providers"}
 
 
 def test_accuracy_weighting_needs_accuracy():
     flow = _flow()
-    asyncio.run(flow.async_step_init({CONF_FORECAST: True}))
+    asyncio.run(flow.async_step_forecast_switch({CONF_FORECAST: True}))
     result = asyncio.run(flow.async_step_forecast(_general(**{CONF_FC_ACCURACY: False})))
     assert result["errors"] == {CONF_FC_WEIGHTING: "weighting_needs_accuracy"}
 
@@ -142,7 +142,7 @@ def test_provider_validation_error_is_shown(monkeypatch):
 
     monkeypatch.setattr(PROVIDERS[A], "async_validate", bad)
     flow = _flow()
-    asyncio.run(flow.async_step_init({CONF_FORECAST: True}))
+    asyncio.run(flow.async_step_forecast_switch({CONF_FORECAST: True}))
     asyncio.run(flow.async_step_forecast(_general(**{CONF_FC_PROVIDERS: [A]})))
     result = asyncio.run(flow.async_step_provider_settings({"forecast_epexpredictor_url": "http://nope"}))
     assert result["errors"] == {"forecast_epexpredictor_url": "cannot_connect"}
@@ -189,7 +189,8 @@ def test_off_is_exactly_the_old_behaviour(setup_env):
     assert len(timers) == 2              # alleen het uur-tik en de morgen-retry
     assert entry.tasks == []             # geen achtergrondtaken
     assert provider_calls == []          # geen enkele voorspel-call
-    assert len(entities) == 45           # exact de bestaande sensorset
+    # Bestaande set (45) + verkoop: 8 metrieken, spread, 3 tabellen, tariefperiode (13).
+    assert len(entities) == 58           # geen voorspel-entiteiten
     assert not any("forecast" in e._attr_unique_id for e in entities)
     assert entry.runtime_data._listeners == []  # niemand luistert mee
 
@@ -203,7 +204,7 @@ def test_on_adds_separate_timer_entities_and_service(setup_env):
     assert entry.tasks == ["dyntarnl_forecast_start"]  # eerste fetch op de achtergrond
     forecast = [e for e in entities if "forecast" in e._attr_unique_id]
     assert {e._attr_unique_id for e in forecast} == forecast_unique_ids(entry.entry_id, cfg())
-    assert len(entities) == 45 + len(forecast)
+    assert len(entities) == 58 + len(forecast)
     assert (DOMAIN, "get_prices") in hass.services.registered
 
 
@@ -236,7 +237,7 @@ def test_deselected_provider_entities_are_removed(setup_env):
 def test_api_key_can_be_cleared(no_network):
     """Een leeggemaakt optioneel veld stuurt HA niet mee; dat moet 'leeg' worden."""
     flow = _flow({**FORECAST_DEFAULTS, "forecast_energypriceforecast_api_key": "oude-key"})
-    asyncio.run(flow.async_step_init({CONF_FORECAST: True}))
+    asyncio.run(flow.async_step_forecast_switch({CONF_FORECAST: True}))
     form = asyncio.run(flow.async_step_forecast(_general()))
     key_field = next(k for k in form["data_schema"].schema if k == "forecast_energypriceforecast_api_key")
     assert key_field.default is None  # geen default die HA weer invult
@@ -257,7 +258,7 @@ def test_custom_supplier_form_opens():
 def test_all_option_forms_build():
     """Elke stap van de options flow moet een geldig formulier opleveren."""
     flow = _flow()
-    for step in (flow.async_step_init, flow.async_step_forecast, flow.async_step_advanced):
+    for step in (flow.async_step_forecast_switch, flow.async_step_forecast, flow.async_step_advanced):
         assert asyncio.run(step())["type"] == "form"
 
 
@@ -277,7 +278,7 @@ def test_leftover_devices_are_removed_own_devices_kept(setup_env):
 def test_ensemble_off_with_accuracy_off_is_allowed():
     """Weging speelt alleen bij het ensemble; zonder ensemble geen foutmelding."""
     flow = _flow()
-    asyncio.run(flow.async_step_init({CONF_FORECAST: True}))
+    asyncio.run(flow.async_step_forecast_switch({CONF_FORECAST: True}))
     result = asyncio.run(
         flow.async_step_forecast(_general(**{"forecast_ensemble": False, CONF_FC_ACCURACY: False}))
     )
@@ -295,7 +296,7 @@ def test_unchanged_provider_settings_are_not_tested_again(monkeypatch):
     for cls in PROVIDERS.values():
         monkeypatch.setattr(cls, "async_validate", down)
     flow = _flow()
-    asyncio.run(flow.async_step_init({CONF_FORECAST: True}))
+    asyncio.run(flow.async_step_forecast_switch({CONF_FORECAST: True}))
     asyncio.run(flow.async_step_forecast(_general()))
     result = asyncio.run(
         flow.async_step_provider_settings({"forecast_epexpredictor_url": FORECAST_DEFAULTS["forecast_epexpredictor_url"]})

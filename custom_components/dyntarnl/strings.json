@@ -77,6 +77,25 @@
         "1": "1/MAE",
         "2": "1/MAE² (rewards accuracy more)"
       }
+    },
+    "contract": {
+      "options": {
+        "dynamic": "Dynamic",
+        "fixed": "Fixed",
+        "variable": "Variable"
+      }
+    },
+    "rate_mode": {
+      "options": {
+        "single": "Single rate",
+        "double": "Double rate (normal/off-peak)"
+      }
+    },
+    "rate_input": {
+      "options": {
+        "all_in": "All-in (incl. energy tax and VAT)",
+        "bare": "Bare supply rate (excl. VAT)"
+      }
     }
   },
   "services": {
@@ -103,19 +122,16 @@
         "horizon": {
           "name": "Horizon",
           "description": "Only quarters up to this many hours from now."
+        },
+        "format": {
+          "name": "Format",
+          "description": "records = per quarter hour (as before); table = the compact buy and sell table, exactly like the table entities."
         }
       }
     }
   },
   "options": {
     "step": {
-      "init": {
-        "title": "Price forecasts",
-        "description": "Optionally extend the published day-ahead prices with EPEX price forecasts up to 7 days ahead. DynTarNL does not forecast itself: it reads the forecasts of external forecasters, averages them (weighted by measured accuracy) and converts them with your supplier's tariffs. Off by default: when off, nothing changes (no extra API calls, no extra entities).",
-        "data": {
-          "forecast_enabled": "Enable price forecasts"
-        }
-      },
       "forecast": {
         "title": "Forecast settings",
         "description": "Forecasts are always fetched as the bare EPEX price; your supplier's formula (markup, energy tax, VAT) is applied by DynTarNL. Published prices always win over forecasts.",
@@ -164,13 +180,183 @@
           "forecast_window_days": "Accuracy is measured over this many most recent days.",
           "forecast_cheapest_hours": "Used by the 'cheapest block start' sensor (next 48 hours, forecasts included)."
         }
+      },
+      "forecast_switch": {
+        "title": "Price forecasts",
+        "description": "Optionally extend the published day-ahead prices with EPEX price forecasts up to 7 days ahead. DynTarNL does not forecast itself: it reads the forecasts of external forecasters, averages them (weighted by measured accuracy) and converts them with your supplier's tariffs. Off by default: when off, nothing changes (no extra API calls, no extra entities).",
+        "data": {
+          "forecast_enabled": "Enable price forecasts"
+        }
+      },
+      "init": {
+        "title": "DynTarNL settings",
+        "menu_options": {
+          "forecast_switch": "Price forecasts",
+          "tariffs": "Tariff periods (purchase & feed-in)"
+        }
+      },
+      "tariffs": {
+        "title": "Tariff periods",
+        "description": "Each period applies from its start date (00:00) until the next one. Every time slot uses the rules of its own period, also in forecasts. Saving reloads DynTarNL (no restart).",
+        "menu_options": {
+          "period_add": "Add a period",
+          "period_edit": "Edit a period",
+          "period_delete": "Delete a period"
+        }
+      },
+      "period_edit": {
+        "title": "Edit a period",
+        "description": "Choose the period to edit.",
+        "data": {
+          "start": "Start date"
+        }
+      },
+      "period_delete": {
+        "title": "Delete a period",
+        "description": "Choose the period to delete. The earliest period must start today or earlier.",
+        "data": {
+          "start": "Start date"
+        }
+      },
+      "period_general": {
+        "title": "Tariff period",
+        "description": "General values of this period.",
+        "data": {
+          "start": "Start date",
+          "contract": "Contract type",
+          "netting": "Netting (salderen)",
+          "vat": "VAT",
+          "tax_elec_ex": "Energy tax electricity (excl. VAT)",
+          "tax_gas_ex": "Energy tax gas (excl. VAT)",
+          "provisional": "Provisional",
+          "note": "Note"
+        },
+        "data_description": {
+          "start": "Applies from 00:00 (Europe/Amsterdam) on this date until the next period starts.",
+          "contract": "Dynamic follows the market price per time slot; fixed/variable uses your contract rates.",
+          "netting": "On until 31-12-2026: feed-in is worth exactly the purchase price of the same time slot. Off from 2027.",
+          "vat": "Percentage, normally 21.",
+          "tax_elec_ex": "€/kWh, first bracket. 2027 (provisional): 0.08802.",
+          "tax_gas_ex": "€/m³. 2027 (provisional): 0.61628.",
+          "provisional": "Mark values that are not final yet (e.g. Belastingplan). You get a repair notice 14 days before the start.",
+          "note": "Free text, e.g. where the values come from."
+        }
+      },
+      "period_details_dynamic": {
+        "title": "Dynamic contract",
+        "description": "Purchase and feed-in for this period. Leave a field empty if unknown: slots then get no price (never 0).",
+        "data": {
+          "buy": "Purchase",
+          "sell": "Feed-in"
+        },
+        "sections": {
+          "buy": {
+            "name": "Purchase",
+            "description": "What you pay per kWh.",
+            "data": {
+              "markup_elec_ex": "Markup electricity (excl. VAT)",
+              "markup_gas_ex": "Markup gas (excl. VAT)"
+            },
+            "data_description": {
+              "markup_elec_ex": "€/kWh. With a supplier that publishes its own prices (Essent, Frank, …) only used for forecast hours in this period; empty = the supplier's current markup.",
+              "markup_gas_ex": "€/m³."
+            }
+          },
+          "sell": {
+            "name": "Feed-in",
+            "description": "What you get per exported kWh. Ignored while netting is on (then feed-in = purchase).",
+            "data": {
+              "export_markup_ex": "Feed-in markup (+) or deduction (−)",
+              "export_costs_ex": "Feed-in costs per kWh",
+              "export_costs_year": "Fixed feed-in costs per year"
+            },
+            "data_description": {
+              "export_markup_ex": "€/kWh on top of the bare market price. May be negative. Only without netting.",
+              "export_costs_ex": "€/kWh deducted from every exported kWh. Only without netting.",
+              "export_costs_year": "Information only (e.g. a bracket/staffel); not part of the kWh price."
+            }
+          }
+        }
+      },
+      "period_details_fixed": {
+        "title": "Fixed / variable contract",
+        "description": "Purchase and feed-in for this period. Variable = a fixed contract whose rate changes: add a new period per change.",
+        "data": {
+          "buy": "Purchase",
+          "sell": "Feed-in"
+        },
+        "sections": {
+          "buy": {
+            "name": "Purchase",
+            "description": "What you pay per kWh.",
+            "data": {
+              "rate_mode": "Single or double rate",
+              "rate_input": "Rates entered as",
+              "rate_elec": "Electricity rate (normal)",
+              "rate_elec_low": "Electricity rate (off-peak)",
+              "rate_gas": "Gas rate",
+              "low_start": "Off-peak from",
+              "low_end": "Off-peak until",
+              "low_weekend": "Whole weekend off-peak",
+              "low_holidays": "Holidays off-peak",
+              "fixed_costs_month": "Fixed supply costs per month"
+            },
+            "data_description": {
+              "rate_mode": "Double = normal and off-peak (dal).",
+              "rate_input": "All-in = incl. energy tax and VAT (as on your contract); bare = supply rate excl. VAT, DynTarNL adds energy tax and VAT.",
+              "rate_elec": "€/kWh, as chosen above (all-in or bare).",
+              "rate_elec_low": "€/kWh. Only with a double rate.",
+              "rate_gas": "€/m³, as chosen above. Empty = no gas price.",
+              "low_start": "Weekdays; default 23:00.",
+              "low_end": "Default 07:00.",
+              "low_weekend": "Saturday and Sunday all day.",
+              "low_holidays": "New Year, Easter, King's Day, Ascension, Whitsun, Christmas (check with your grid operator).",
+              "fixed_costs_month": "Information only; not part of the kWh price."
+            }
+          },
+          "sell": {
+            "name": "Feed-in",
+            "description": "What you get per exported kWh. Ignored while netting is on (then feed-in = purchase).",
+            "data": {
+              "export_rate_ex": "Feed-in compensation (normal)",
+              "export_rate_low_ex": "Feed-in compensation (off-peak)",
+              "export_costs_ex": "Feed-in costs per kWh",
+              "export_costs_year": "Fixed feed-in costs per year"
+            },
+            "data_description": {
+              "export_rate_ex": "€/kWh, bare (no energy tax, no VAT). Only without netting.",
+              "export_rate_low_ex": "€/kWh. Empty = same as normal.",
+              "export_costs_ex": "€/kWh deducted from every exported kWh. Only without netting.",
+              "export_costs_year": "Information only (e.g. a bracket/staffel); not part of the kWh price."
+            }
+          }
+        }
       }
     },
     "error": {
       "no_providers": "Select at least one source.",
       "weighting_needs_accuracy": "Automatic weighting needs accuracy measurement turned on.",
       "cannot_connect": "Could not reach this source.",
-      "invalid_api_key": "The API key was rejected."
+      "invalid_api_key": "The API key was rejected.",
+      "duplicate_start": "A period with this start date already exists.",
+      "gap_before_first": "The earliest period must start today or earlier (no gap before the first period).",
+      "last_period": "The last period cannot be deleted.",
+      "missing_fields": "Required values are missing: {missing}. Fill them in, or mark the period as provisional.",
+      "invalid_period": "These values do not form a valid period."
+    }
+  },
+  "issues": {
+    "period_incomplete": {
+      "title": "Tariff period {start} is provisional or incomplete",
+      "description": "The DynTarNL tariff period starting {start} applies now or within 14 days, but is marked provisional ({provisional}) or misses values: {missing}.\n\nTime slots without a value get no price (unknown), never 0. Check the values (e.g. the final Belastingplan and your supplier's new conditions) via Settings → Devices & services → DynTarNL → Configure → Tariff periods, and clear the \"provisional\" flag."
+    },
+    "export_below_minimum": {
+      "title": "Feed-in compensation below the legal minimum ({start})",
+      "description": "In the tariff period starting {start} the configured feed-in compensation is lower than 50% of the bare supply rate. From 2027 to 2029 suppliers must pay at least that. Check the value with your contract."
+    },
+    "legacy_export_entities": {
+      "title": "Old feed-in entities will be replaced in DynTarNL 2.0",
+      "description": "These DynTarNL entities are used in an automation or script:\n{entities}\n\nThey keep working unchanged in 1.x. They show the dynamic feed-in compensation (market − markup) and do not know netting, feed-in costs or contract types. The sell entities (sell_*) and the sell table do, and replace them in 2.0. Switch your automations and scripts to the entity after the arrow."
     }
   }
 }

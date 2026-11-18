@@ -8,7 +8,8 @@ from homeassistant.util import dt as dt_util
 
 from ..const import ELECTRICITY, ENSEMBLE
 from ..model import PriceData
-from ..prices import Tariff, apply_formula, feed_in_value
+from ..prices import Tariff, feed_in_value
+from ..tariffs import PriceResolver
 from .engine import ForecastData, merge, primary_series, published_records
 from .model import QUARTER, SOURCE_PUBLISHED, ForecastConfig, QuarterRecord, floor_quarter
 
@@ -42,10 +43,15 @@ def _summary(records: list[QuarterRecord]) -> dict:
 
 
 def cheapest_block(
-    records: list[QuarterRecord], now: datetime, hours: int, lookahead_hours: int
+    records: list[QuarterRecord],
+    now: datetime,
+    hours: int,
+    lookahead_hours: int,
+    sell: bool = False,
 ) -> dict | None:
     """Goedkoopste aaneengesloten blok van `hours` uur (all-in), binnen `lookahead_hours`,
-    inclusief voorspelde kwartieren.
+    inclusief voorspelde kwartieren. Met `sell=True`: het blok met de hóógste
+    verkoopprijs (het beste moment om terug te leveren).
 
     Het blok begint op de resolutie van de gepubliceerde prijzen (bij uurprijzen: een heel
     uur) en mag het lopende uur zijn. Anders startte het om bijv. 13:15 en schoof het elk
@@ -55,7 +61,10 @@ def cheapest_block(
     first = floor_quarter(now)
     first -= timedelta(seconds=int(first.timestamp()) % step)
     last = first + timedelta(hours=lookahead_hours)
-    candidates = [r for r in records if first <= r.start < last and r.price_allin is not None]
+    def price(r: QuarterRecord) -> float | None:
+        return r.price_sell if sell else r.price_allin
+
+    candidates = [r for r in records if first <= r.start < last and price(r) is not None]
     size = max(1, hours * 4)
     best: tuple[float, int] | None = None
     run_start = 0
@@ -66,13 +75,17 @@ def cheapest_block(
             j = i - size + 1
             if int(candidates[j].start.timestamp()) % step:
                 continue  # blok begint niet op een heel uur (of kwartier bij kwartierprijzen)
-            total = sum(r.price_allin for r in candidates[j : i + 1])
-            if best is None or total < best[0]:
-                best = (total, j)
+            total = sum(price(r) for r in candidates[j : i + 1])
+            score = -total if sell else total
+            if best is None or score < best[0]:
+                best = (score, j)
     if best is None:
         return None
     block = candidates[best[1] : best[1] + size]
-    return {"start": block[0].start, "end": block[-1].end, "hours": hours, **_summary(block)}
+    out = {"start": block[0].start, "end": block[-1].end, "hours": hours, **_summary(block)}
+    if sell:
+        out["avg_price_sell"] = _mean([r.price_sell for r in block])
+    return out
 
 
 def window_average(records: list[QuarterRecord], start: datetime, end: datetime) -> dict | None:
@@ -117,7 +130,9 @@ def chart_step(records: list[QuarterRecord]) -> timedelta:
 
 
 def forecast_chart(
-    records: list[QuarterRecord], tariff: Tariff | None, step: timedelta = timedelta(hours=1)
+    records: list[QuarterRecord],
+    tariff: Tariff | PriceResolver | None,
+    step: timedelta = timedelta(hours=1),
 ) -> tuple[list, list, list, list]:
     """Alleen de voorspelde tijdvakken, als grafiekreeksen naast de bestaande kaart:
     all-in [[ms, prijs]], beurs incl. btw [[ms, prijs]], foutband [[ms, laag, hoog]] en
@@ -126,10 +141,12 @@ def forecast_chart(
     Gemiddeld per `step` (standaard per uur, net als de gepubliceerde kolommen):
     ApexCharts baseert de kolombreedte op het kleinste tijdsverschil over álle series,
     dus kwartierpunten zouden de uurkolommen vier keer zo smal maken. Beurs en all-in
-    komen uit dezelfde apply_formula, toegepast op de gemiddelde kale prijs.
+    komen uit dezelfde apply_formula, toegepast op de gemiddelde kale prijs, met het tarief
+    van de periode van dat uur (vast contract: het contracttarief).
     """
     if tariff is None:
         return [], [], [], []
+    resolver = tariff if isinstance(tariff, PriceResolver) else PriceResolver(ref_tariff=tariff)
     size = int(step.total_seconds())
     groups: dict[int, list[QuarterRecord]] = {}
     for r in records:
@@ -144,7 +161,9 @@ def forecast_chart(
         if len(group) < size // int(QUARTER.total_seconds()):
             continue  # onvolledig uur aan de rand van de horizon: geen halve kolom tonen
         begin = dt_util.as_utc(datetime.fromtimestamp(ts, tz=dt_util.UTC))
-        slot = apply_formula(begin, begin + step, sum(r.price_raw for r in group) / len(group), tariff)
+        slot = resolver.buy(begin, begin + step, sum(r.price_raw for r in group) / len(group))
+        if slot is None:
+            continue  # geen tarief voor deze periode (bijv. nog niet ingevuld)
         ms = ts * 1000
         allin.append([ms, round(slot.total, 5)])
         market.append([ms, round(slot.market, 5)])
@@ -166,11 +185,14 @@ def service_response(
     provider: str,
     horizon_hours: int | None,
     now: datetime,
+    periods: tuple = (),
 ) -> dict:
     """Respons van `dyntarnl.get_prices`. Gas en 'zonder voorspelling' geven alleen
     gepubliceerde prijzen; voor gas op de eigen resolutie (gasdag)."""
     ed = (prices or {}).get(energy)
-    published = published_records(ed, supplier, quarters=energy == ELECTRICITY)
+    published = published_records(
+        ed, supplier, quarters=energy == ELECTRICITY, periods=periods if energy == ELECTRICITY else ()
+    )
     enabled = cfg is not None and cfg.enabled
     if enabled and provider not in (ENSEMBLE, PROVIDER_ALL) and provider not in cfg.providers:
         raise ValueError(f"Onbekende of uitgeschakelde provider: {provider}")

@@ -17,3 +17,6 @@ Thumbs.db
 # Home Assistant test artifacts
 .storage/
 *.log
+
+# Lokale export van de HA-states (niet committen)
+dyntarnl_states.json

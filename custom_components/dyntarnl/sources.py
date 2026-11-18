@@ -11,15 +11,9 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_EPEX_SOURCE,
-    CONF_MARKUP_ELEC,
-    CONF_MARKUP_GAS,
-    CONF_TAX_ELEC,
-    CONF_TAX_GAS,
-    CONF_VAT,
     DEFAULT_EPEX_SOURCE,
     DEFAULT_TAX_ELEC,
     DEFAULT_TAX_GAS,
-    DEFAULT_VAT,
     EASYENERGY_URL,
     ELECTRICITY,
     ENERGYZERO_URL,
@@ -32,7 +26,6 @@ from .const import (
     GROUP_TAX,
 )
 from .model import EnergyData, PriceData, Slot, bucket_by_day, localize_naive_series, localize_naive_slots, parse_dt
-from .prices import Tariff, apply_formula
 
 _TIMEOUT = aiohttp.ClientTimeout(total=30)
 _VAT_FACTOR = 1.21  # easyEnergy en Frank rekenen met 21% btw (zie bucket_by_day(..., 21.0))
@@ -235,26 +228,33 @@ async def build_custom(session: aiohttp.ClientSession, cfg: dict) -> PriceData:
     De kale EPEX komt van de gekozen bron (`epex_source`, default easyEnergy). Alleen de
     beursprijs van die bron wordt gebruikt; de opslag/belasting komen van de gebruiker.
     """
-    vat = float(cfg.get(CONF_VAT, DEFAULT_VAT))
+    from .tariffs import legacy_periods  # lazy: tariffs importeert prices/model
+
     base = await _epex_source(session, cfg.get(CONF_EPEX_SOURCE, DEFAULT_EPEX_SOURCE))
-    params = {
-        ELECTRICITY: (float(cfg.get(CONF_MARKUP_ELEC, 0.0)), float(cfg.get(CONF_TAX_ELEC, 0.0)), "kWh"),
-        GAS: (float(cfg.get(CONF_MARKUP_GAS, 0.0)), float(cfg.get(CONF_TAX_GAS, 0.0)), "m³"),
-    }
+    return price_with_periods(base, legacy_periods(cfg), custom=True)
+
+
+def price_with_periods(base: PriceData, periods, custom: bool) -> PriceData:
+    """Inkoopprijs per slot volgens de tariefperiode van dat slot.
+
+    API-leverancier + dynamisch: slots ongewijzigd (bit-voor-bit). Custom: de formule met
+    de periodewaarden. Vast/variabel: het contracttarief (de beurs blijft informatief).
+    """
+    from .tariffs import apply_periods, period_at
 
     result: PriceData = {}
-    for energy, (markup_ex, tax_ex, unit) in params.items():
-        ed = base.get(energy)
-        if not ed:
-            continue
+    for energy, ed in base.items():
+        def mapped(slots, _energy=energy):
+            return apply_periods(slots, periods, _energy, custom) if slots else None
 
-        tariff = Tariff(fee_ex=markup_ex, tax_ex=tax_ex, vat=vat)
-
-        def mapped(slots):
-            return [apply_formula(s.start, s.end, s.market_ex, tariff) for s in slots] if slots else None
-
+        # Btw-percentage: van de leverancier, tenzij DynTarNL zelf rekent (Custom of een
+        # vast contract vandaag); dan dat van de periode van vandaag.
+        vat = ed.vat_percentage
+        today = period_at(periods, ed.today[0].start) if ed.today else None
+        if today is not None and today.vat is not None and (custom or not today.is_dynamic):
+            vat = today.vat
         result[energy] = EnergyData(
-            unit=unit,
+            unit=ed.unit,
             vat_percentage=vat,
             today=mapped(ed.today) or [],
             tomorrow=mapped(ed.tomorrow),

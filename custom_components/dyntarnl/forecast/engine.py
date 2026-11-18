@@ -17,7 +17,8 @@ from homeassistant.util import dt as dt_util
 
 from ..const import ELECTRICITY, FC_SERIES_MAX_AGE_H, LEAD_BUCKETS
 from ..model import EnergyData, PriceData
-from ..prices import Tariff, apply_formula, tariff_from_slot
+from ..prices import Tariff, tariff_from_slot
+from ..tariffs import Period, PriceResolver, period_at, sell_slot
 from .accuracy import AccuracyTracker
 from .ensemble import Combined, Stat, combine, compute_weights, expected_error
 from .model import (
@@ -42,6 +43,8 @@ class ForecastData:
     merged: list[QuarterRecord]
     #: Huidig gewicht per provider per looptijd-bucket (voor diagnostiek).
     weights: dict[str, dict[str, float]] = field(default_factory=dict)
+    #: Prijs per kwartier volgens de tariefperiode van dat kwartier.
+    resolver: PriceResolver | None = None
 
 
 def all_slots(ed: EnergyData | None) -> list:
@@ -50,11 +53,18 @@ def all_slots(ed: EnergyData | None) -> list:
     return (ed.yesterday or []) + ed.today + (ed.tomorrow or [])
 
 
-def published_records(ed: EnergyData | None, supplier: str, quarters: bool = True) -> list[QuarterRecord]:
+def published_records(
+    ed: EnergyData | None, supplier: str, quarters: bool = True, periods: tuple[Period, ...] = ()
+) -> list[QuarterRecord]:
     """Gepubliceerde slots als records. Stroom per kwartier (uur → 4× `expanded`),
-    gas op de eigen resolutie (een gasdag als één record)."""
+    gas op de eigen resolutie (een gasdag als één record). Met periodes ook de verkoopprijs."""
     out: list[QuarterRecord] = []
     for s in all_slots(ed):
+        sold = (
+            sell_slot(period_at(periods, s.start), s, s.start, s.end, s.market_ex, s.market)
+            if periods
+            else None
+        )
         start, end = dt_util.as_utc(s.start), dt_util.as_utc(s.end)
         steps = max(1, int((end - start) / QUARTER)) if quarters else 1
         step = (end - start) / steps
@@ -68,6 +78,8 @@ def published_records(ed: EnergyData | None, supplier: str, quarters: bool = Tru
                     source=SOURCE_PUBLISHED,
                     supplier=supplier,
                     expanded=steps > 1 and quarters,
+                    buy=s,
+                    sell=sold,
                 )
             )
     return out
@@ -88,17 +100,20 @@ def current_tariff(ed: EnergyData | None) -> Tariff | None:
     return tariff_from_slot(max(slots, key=lambda s: s.start), ed.vat_percentage)
 
 
-def _allin(start: datetime, raw: float, tariff: Tariff | None) -> float | None:
-    if tariff is None:
-        return None
-    return apply_formula(start, start + QUARTER, raw, tariff).total
+def _priced(resolver: PriceResolver, start: datetime, raw: float) -> tuple:
+    """(inkoopslot, verkoopslot) van een voorspeld kwartier, volgens zijn eigen periode."""
+    end = start + QUARTER
+    buy = resolver.buy(start, end, raw)
+    return buy, resolver.sell(buy, start, end, raw)
 
 
-def _scale(error: float | None, tariff: Tariff | None) -> float | None:
-    """All-in marge = kale marge × btw-factor (vaste opslag verandert de marge niet)."""
-    if error is None or tariff is None:
+def _scale(error: float | None, resolver: PriceResolver, start: datetime) -> float | None:
+    """All-in marge = kale marge × btw-factor (vaste opslag verandert de marge niet);
+    0 bij een vast contract (de prijs ligt vast)."""
+    factor = resolver.error_factor(start)
+    if error is None or factor is None:
         return None
-    return error * tariff.factor
+    return error * factor
 
 
 def _usable(stat: Stat | None, cfg: ForecastConfig) -> Stat | None:
@@ -126,11 +141,15 @@ def build(
     cfg: ForecastConfig,
     supplier: str,
     now: datetime,
+    periods: tuple[Period, ...] = (),
+    custom: bool = False,
 ) -> tuple[ForecastData, dict[datetime, Combined]]:
     now = dt_util.as_utc(now)
     ed = (prices or {}).get(ELECTRICITY)
     tariff = current_tariff(ed)
-    published = published_records(ed, supplier)
+    slots = all_slots(ed)
+    resolver = PriceResolver(periods, tariff, max(s.start for s in slots) if slots else None, custom)
+    published = published_records(ed, supplier, periods=periods)
 
     first = floor_quarter(now)
     last = first + timedelta(hours=cfg.horizon_hours)
@@ -162,12 +181,15 @@ def build(
         for p in s.points:
             stat = _usable(stat_fn(s.provider, lead_bucket(p.start, s.fetched_at)), cfg)
             err = stat.mae if stat else None
+            buy, sold = _priced(resolver, p.start, p.price_raw)
             recs.append(
                 QuarterRecord(
                     start=p.start,
                     end=p.start + QUARTER,
                     price_raw=p.price_raw,
-                    price_allin=_allin(p.start, p.price_raw, tariff),
+                    price_allin=None if buy is None else buy.total,
+                    buy=buy,
+                    sell=sold,
                     source=SOURCE_FORECAST,
                     providers=(s.provider,),
                     fetched_at=s.fetched_at,
@@ -176,7 +198,7 @@ def build(
                     spread_min=p.price_raw,
                     spread_max=p.price_raw,
                     expected_error_raw=err,
-                    expected_error_allin=_scale(err, tariff),
+                    expected_error_allin=_scale(err, resolver, p.start),
                 )
             )
         provider_records[s.provider] = recs
@@ -196,12 +218,15 @@ def build(
                 mae_cache[key] = ensemble_mae(tracker, key[0], key[1], key[2], cfg)
             mae = mae_cache[key]
             err = expected_error(mae, c.spread)
+            buy, sold = _priced(resolver, c.start, c.value)
             ensemble_records.append(
                 QuarterRecord(
                     start=c.start,
                     end=c.start + QUARTER,
                     price_raw=c.value,
-                    price_allin=_allin(c.start, c.value, tariff),
+                    price_allin=None if buy is None else buy.total,
+                    buy=buy,
+                    sell=sold,
                     source=SOURCE_FORECAST,
                     providers=c.providers,
                     fetched_at=c.fetched_at,
@@ -210,7 +235,7 @@ def build(
                     spread_min=c.spread_min,
                     spread_max=c.spread_max,
                     expected_error_raw=err,
-                    expected_error_allin=_scale(err, tariff),
+                    expected_error_allin=_scale(err, resolver, c.start),
                 )
             )
 
@@ -222,6 +247,7 @@ def build(
         ensemble=ensemble_records,
         merged=merge(published, primary_series(ensemble_records, provider_records, cfg)),
         weights=current_weights(tracker, cfg),
+        resolver=resolver,
     )
     return data, combined
 

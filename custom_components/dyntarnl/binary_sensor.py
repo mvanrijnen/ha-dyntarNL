@@ -19,6 +19,7 @@ from .coordinator import DynTarNLConfigEntry
 from .entity import DynTarNLEntity
 from .model import EnergyData
 from .prices import feed_in_value, slot_at
+from .tables import next_negative_sell, row_at
 
 type StateFn = Callable[[EnergyData, datetime], bool | None]
 
@@ -103,6 +104,40 @@ class DynTarNLFeedInBinary(DynTarNLEntity, BinarySensorEntity):
         return self.entity_description.state_fn(data, dt_util.now())
 
 
+class DynTarNLSellNegative(DynTarNLEntity, BinarySensorEntity):
+    """Aan als terugleveren nu geld kost (verkoopprijs < 0), met de eerstvolgende periode
+    waarin dat geldt (gepubliceerd, contract of voorspeld)."""
+
+    _attr_name = "sell negative now"
+    _attr_icon = "mdi:transmission-tower-off"
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, ELECTRICITY)
+        self._attr_unique_id = f"{coordinator.config_entry.entry_id}_electricity_sell_negative_now"
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if self.coordinator.forecast is not None:
+            self.async_on_remove(self.coordinator.forecast.async_add_listener(self.async_write_ha_state))
+
+    @property
+    def is_on(self) -> bool | None:
+        row = row_at(self.coordinator.rows(ELECTRICITY)[0], dt_util.now())
+        if row is None or row.sell is None:
+            return None
+        return row.sell.total < 0
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        found = next_negative_sell(self.coordinator.rows(ELECTRICITY)[0], dt_util.now())
+        if found is None:
+            return {"next_start": None, "next_end": None}
+        return {
+            "next_start": dt_util.as_local(found[0]).isoformat(),
+            "next_end": dt_util.as_local(found[1]).isoformat(),
+        }
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: DynTarNLConfigEntry,
@@ -113,4 +148,5 @@ async def async_setup_entry(
         DynTarNLTomorrowAvailable(coordinator, energy) for energy in (ELECTRICITY, GAS)
     ]
     entities.extend(DynTarNLFeedInBinary(coordinator, d) for d in _BINARY_SENSORS)
+    entities.append(DynTarNLSellNegative(coordinator))
     async_add_entities(entities)

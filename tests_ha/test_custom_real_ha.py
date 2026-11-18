@@ -110,7 +110,9 @@ async def test_options_flow_opens_and_all_steps_validate(hass, prices):
     entry = await _add_custom(hass)
 
     result = await hass.config_entries.options.async_init(entry.entry_id)
-    assert result["type"] is FlowResultType.FORM and result["step_id"] == "init"
+    assert result["type"] is FlowResultType.MENU and result["step_id"] == "init"
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "forecast_switch"})
+    assert result["type"] is FlowResultType.FORM and result["step_id"] == "forecast_switch"
 
     # Voorspellingen aan: elke stap moet een geldig formulier geven.
     result = await hass.config_entries.options.async_configure(result["flow_id"], {"forecast_enabled": True})
@@ -134,6 +136,7 @@ async def test_options_flow_opens_and_all_steps_validate(hass, prices):
 async def test_options_off_keeps_custom_tariffs(hass, prices):
     entry = await _add_custom(hass)
     result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "forecast_switch"})
     result = await hass.config_entries.options.async_configure(result["flow_id"], {"forecast_enabled": False})
     assert result["type"] is FlowResultType.CREATE_ENTRY
     await hass.async_block_till_done()

@@ -80,12 +80,17 @@ def _install_ha_stubs() -> None:
         def async_create_entry(self, **kw):
             return {"type": "create_entry", **kw}
 
+        def async_show_menu(self, **kw):
+            return {"type": "menu", **kw}
+
     class ConfigFlow(_FlowBase):
         def __init_subclass__(cls, domain=None, **kw):
             super().__init_subclass__(**kw)
 
     ce.ConfigFlow = ConfigFlow
     ce.OptionsFlow = type("OptionsFlow", (_FlowBase,), {})
+
+    _mod("homeassistant.data_entry_flow").section = lambda schema, options=None: schema
 
     exc = _mod("homeassistant.exceptions")
     exc.HomeAssistantError = type("HomeAssistantError", (Exception,), {})
@@ -105,6 +110,7 @@ def _install_ha_stubs() -> None:
     core.HomeAssistant = object
     core.ServiceCall = object
     core.callback = lambda f: f
+    core.CoreState = type("CoreState", (), {"running": "running", "not_running": "not_running"})
     core.ServiceResponse = dict
     core.SupportsResponse = type("SupportsResponse", (), {"ONLY": "only", "OPTIONAL": "optional"})
 
@@ -145,7 +151,7 @@ def _install_ha_stubs() -> None:
     selector = _mod("homeassistant.helpers.selector")
     for name in (
         "BooleanSelector", "NumberSelector", "NumberSelectorConfig", "SelectSelector",
-        "SelectSelectorConfig", "TextSelector", "TextSelectorConfig",
+        "SelectSelectorConfig", "TextSelector", "TextSelectorConfig", "DateSelector", "TimeSelector",
     ):
         setattr(selector, name, lambda *a, _n=name, **k: (_n, a, k))
     selector.SelectOptionDict = dict
@@ -222,6 +228,20 @@ def _install_ha_stubs() -> None:
     ]
     helpers.entity_registry = er
     _mod("homeassistant.helpers.entity_platform").AddEntitiesCallback = object
+
+    # Repairs: in-memory issue-register (per hass-object).
+    ir = _mod("homeassistant.helpers.issue_registry")
+    ir.IssueSeverity = type("IssueSeverity", (), {"WARNING": "warning", "ERROR": "error"})
+
+    def _ir_reg(hass):
+        if not hasattr(hass, "_issues"):
+            hass._issues = {}
+        return hass._issues
+
+    ir.async_get = lambda hass: type("Reg", (), {"issues": _ir_reg(hass)})()
+    ir.async_create_issue = lambda hass, domain, issue_id, **kw: _ir_reg(hass).__setitem__((domain, issue_id), kw)
+    ir.async_delete_issue = lambda hass, domain, issue_id: _ir_reg(hass).pop((domain, issue_id), None)
+    helpers.issue_registry = ir
 
     util = _mod("homeassistant.util")
     dt = _mod("homeassistant.util.dt")

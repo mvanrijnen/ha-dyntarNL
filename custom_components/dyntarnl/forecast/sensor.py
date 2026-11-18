@@ -81,13 +81,20 @@ def _cheapest(c: Coord) -> dict | None:
     return cheapest_block(_merged(c), dt_util.utcnow(), c.cfg.cheapest_hours, FC_CHEAPEST_LOOKAHEAD_H)
 
 
+def _best_sell(c: Coord) -> dict | None:
+    return cheapest_block(
+        _merged(c), dt_util.utcnow(), c.cfg.cheapest_hours, FC_CHEAPEST_LOOKAHEAD_H, sell=True
+    )
+
+
 def _avg_attrs(c: Coord) -> dict | None:
     merged = _merged(c)
     info = _clean(next_24h(merged, dt_util.utcnow()), drop=("avg_price_allin",)) or {}
     prices = chart_series(merged)
-    forecast, forecast_market, band, forecast_export = forecast_chart(
-        merged, c.data.tariff if c.data else None, chart_step(merged)
-    )
+    pricing = None
+    if c.data:
+        pricing = c.data.resolver or c.data.tariff
+    forecast, forecast_market, band, forecast_export = forecast_chart(merged, pricing, chart_step(merged))
     forecasts = [r for r in merged if r.source != "published"]
     info.update(
         {
@@ -115,6 +122,15 @@ ENERGY_SENSORS: tuple[ForecastSensorDescription, ...] = (
         on_energy_device=True,
         value_fn=lambda c: (b := _cheapest(c)) and b["start"],
         attr_fn=lambda c: _clean(_cheapest(c), drop=("start",)),
+    ),
+    ForecastSensorDescription(
+        key="forecast_sell_best_start",
+        name="sell best block start",
+        icon="mdi:clock-star-four-points",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        on_energy_device=True,
+        value_fn=lambda c: (b := _best_sell(c)) and b["start"],
+        attr_fn=lambda c: _clean(_best_sell(c), drop=("start",)),
     ),
     ForecastSensorDescription(
         key="forecast_total_avg_24h",

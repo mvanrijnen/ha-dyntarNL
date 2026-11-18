@@ -77,6 +77,25 @@
         "1": "1/MAE",
         "2": "1/MAE² (beloont nauwkeurigheid sterker)"
       }
+    },
+    "contract": {
+      "options": {
+        "dynamic": "Dynamisch",
+        "fixed": "Vast",
+        "variable": "Variabel"
+      }
+    },
+    "rate_mode": {
+      "options": {
+        "single": "Enkeltarief",
+        "double": "Dubbeltarief (normaal/dal)"
+      }
+    },
+    "rate_input": {
+      "options": {
+        "all_in": "All-in (incl. energiebelasting en btw)",
+        "bare": "Kaal leveringstarief (excl. btw)"
+      }
     }
   },
   "services": {
@@ -103,19 +122,16 @@
         "horizon": {
           "name": "Horizon",
           "description": "Alleen kwartieren tot zoveel uur vanaf nu."
+        },
+        "format": {
+          "name": "Formaat",
+          "description": "records = per kwartier (zoals voorheen); table = de compacte inkoop- en verkooptabel, precies zoals de tabel-entiteiten."
         }
       }
     }
   },
   "options": {
     "step": {
-      "init": {
-        "title": "Prijsvoorspellingen",
-        "description": "Vul de gepubliceerde day-ahead prijzen optioneel aan met EPEX-prijsvoorspellingen tot 7 dagen vooruit. DynTarNL voorspelt zelf niets: het leest de voorspellingen van externe voorspellers uit, middelt ze (gewogen naar gemeten nauwkeurigheid) en rekent ze om met de tarieven van je leverancier. Standaard uit: staat dit uit, dan verandert er niets (geen extra API-calls, geen extra entiteiten).",
-        "data": {
-          "forecast_enabled": "Prijsvoorspellingen aanzetten"
-        }
-      },
       "forecast": {
         "title": "Instellingen voorspellingen",
         "description": "Voorspellingen worden altijd als kale EPEX-prijs opgehaald; de formule van je leverancier (opslag, energiebelasting, btw) past DynTarNL zelf toe. Gepubliceerde prijzen winnen altijd van een voorspelling.",
@@ -164,13 +180,183 @@
           "forecast_window_days": "Over zoveel recente dagen wordt de nauwkeurigheid gemeten.",
           "forecast_cheapest_hours": "Voor de sensor 'cheapest block start' (komende 48 uur, inclusief voorspellingen)."
         }
+      },
+      "forecast_switch": {
+        "title": "Prijsvoorspellingen",
+        "description": "Vul de gepubliceerde day-ahead prijzen optioneel aan met EPEX-prijsvoorspellingen tot 7 dagen vooruit. DynTarNL voorspelt zelf niets: het leest de voorspellingen van externe voorspellers uit, middelt ze (gewogen naar gemeten nauwkeurigheid) en rekent ze om met de tarieven van je leverancier. Standaard uit: staat dit uit, dan verandert er niets (geen extra API-calls, geen extra entiteiten).",
+        "data": {
+          "forecast_enabled": "Prijsvoorspellingen aanzetten"
+        }
+      },
+      "init": {
+        "title": "DynTarNL-instellingen",
+        "menu_options": {
+          "forecast_switch": "Prijsvoorspellingen",
+          "tariffs": "Tariefperiodes (inkoop & teruglevering)"
+        }
+      },
+      "tariffs": {
+        "title": "Tariefperiodes",
+        "description": "Elke periode geldt vanaf haar ingangsdatum (00:00) tot de volgende. Elk tijdslot krijgt de regels van zijn eigen periode, ook in voorspellingen. Opslaan herlaadt DynTarNL (geen herstart).",
+        "menu_options": {
+          "period_add": "Periode toevoegen",
+          "period_edit": "Periode wijzigen",
+          "period_delete": "Periode verwijderen"
+        }
+      },
+      "period_edit": {
+        "title": "Periode wijzigen",
+        "description": "Kies de periode die je wilt wijzigen.",
+        "data": {
+          "start": "Ingangsdatum"
+        }
+      },
+      "period_delete": {
+        "title": "Periode verwijderen",
+        "description": "Kies de periode die je wilt verwijderen. De vroegste periode moet vandaag of eerder beginnen.",
+        "data": {
+          "start": "Ingangsdatum"
+        }
+      },
+      "period_general": {
+        "title": "Tariefperiode",
+        "description": "Algemene waarden van deze periode.",
+        "data": {
+          "start": "Ingangsdatum",
+          "contract": "Contracttype",
+          "netting": "Saldering",
+          "vat": "Btw",
+          "tax_elec_ex": "Energiebelasting stroom (excl. btw)",
+          "tax_gas_ex": "Energiebelasting gas (excl. btw)",
+          "provisional": "Voorlopig",
+          "note": "Notitie"
+        },
+        "data_description": {
+          "start": "Geldt vanaf 00:00 (Europe/Amsterdam) op deze datum tot de volgende periode begint.",
+          "contract": "Dynamisch volgt de beursprijs per tijdslot; vast/variabel gebruikt je contracttarieven.",
+          "netting": "Aan t/m 31-12-2026: teruglevering is precies de inkoopprijs van hetzelfde tijdslot waard. Uit vanaf 2027.",
+          "vat": "Percentage, normaal 21.",
+          "tax_elec_ex": "€/kWh, eerste schijf. 2027 (voorlopig): 0,08802.",
+          "tax_gas_ex": "€/m³. 2027 (voorlopig): 0,61628.",
+          "provisional": "Markeer waarden die nog niet definitief zijn (bijv. Belastingplan). Je krijgt 14 dagen voor de ingangsdatum een repair-melding.",
+          "note": "Vrije tekst, bijv. waar de waarden vandaan komen."
+        }
+      },
+      "period_details_dynamic": {
+        "title": "Dynamisch contract",
+        "description": "Inkoop en teruglevering voor deze periode. Laat een veld leeg als het nog onbekend is: die slots krijgen dan geen prijs (nooit 0).",
+        "data": {
+          "buy": "Inkoop",
+          "sell": "Verkoop (teruglevering)"
+        },
+        "sections": {
+          "buy": {
+            "name": "Inkoop",
+            "description": "Wat je per kWh betaalt.",
+            "data": {
+              "markup_elec_ex": "Opslag stroom (excl. btw)",
+              "markup_gas_ex": "Opslag gas (excl. btw)"
+            },
+            "data_description": {
+              "markup_elec_ex": "€/kWh. Bij een leverancier die zelf prijzen publiceert (Essent, Frank, …) alleen voor voorspelde uren in deze periode; leeg = de huidige opslag van de leverancier.",
+              "markup_gas_ex": "€/m³."
+            }
+          },
+          "sell": {
+            "name": "Verkoop (teruglevering)",
+            "description": "Wat je per teruggeleverde kWh krijgt. Telt niet zolang saldering aan staat (dan verkoop = inkoop).",
+            "data": {
+              "export_markup_ex": "Opslag (+) of korting (−) teruglevering",
+              "export_costs_ex": "Terugleverkosten per kWh",
+              "export_costs_year": "Vaste terugleverkosten per jaar"
+            },
+            "data_description": {
+              "export_markup_ex": "€/kWh bovenop de kale beursprijs. Mag negatief. Alleen zonder saldering.",
+              "export_costs_ex": "€/kWh, gaat af van elke teruggeleverde kWh. Alleen zonder saldering.",
+              "export_costs_year": "Alleen informatief (bijv. een staffel); niet in de kWh-prijs."
+            }
+          }
+        }
+      },
+      "period_details_fixed": {
+        "title": "Vast / variabel contract",
+        "description": "Inkoop en teruglevering voor deze periode. Variabel = een vast contract waarvan het tarief wijzigt: voeg per wijziging een nieuwe periode toe.",
+        "data": {
+          "buy": "Inkoop",
+          "sell": "Verkoop (teruglevering)"
+        },
+        "sections": {
+          "buy": {
+            "name": "Inkoop",
+            "description": "Wat je per kWh betaalt.",
+            "data": {
+              "rate_mode": "Enkel- of dubbeltarief",
+              "rate_input": "Tarieven ingevoerd als",
+              "rate_elec": "Tarief stroom (normaal)",
+              "rate_elec_low": "Tarief stroom (dal)",
+              "rate_gas": "Tarief gas",
+              "low_start": "Dal vanaf",
+              "low_end": "Dal tot",
+              "low_weekend": "Hele weekend dal",
+              "low_holidays": "Feestdagen dal",
+              "fixed_costs_month": "Vaste leveringskosten per maand"
+            },
+            "data_description": {
+              "rate_mode": "Dubbel = normaal en dal.",
+              "rate_input": "All-in = incl. energiebelasting en btw (zoals op je contract); kaal = leveringstarief excl. btw, DynTarNL telt energiebelasting en btw erbij op.",
+              "rate_elec": "€/kWh, zoals hierboven gekozen (all-in of kaal).",
+              "rate_elec_low": "€/kWh. Alleen bij dubbeltarief.",
+              "rate_gas": "€/m³, zoals hierboven gekozen. Leeg = geen gasprijs.",
+              "low_start": "Werkdagen; standaard 23:00.",
+              "low_end": "Standaard 07:00.",
+              "low_weekend": "Zaterdag en zondag de hele dag.",
+              "low_holidays": "Nieuwjaar, Pasen, Koningsdag, Hemelvaart, Pinksteren, Kerst (controleer bij je netbeheerder).",
+              "fixed_costs_month": "Alleen informatief; niet in de kWh-prijs."
+            }
+          },
+          "sell": {
+            "name": "Verkoop (teruglevering)",
+            "description": "Wat je per teruggeleverde kWh krijgt. Telt niet zolang saldering aan staat (dan verkoop = inkoop).",
+            "data": {
+              "export_rate_ex": "Terugleververgoeding (normaal)",
+              "export_rate_low_ex": "Terugleververgoeding (dal)",
+              "export_costs_ex": "Terugleverkosten per kWh",
+              "export_costs_year": "Vaste terugleverkosten per jaar"
+            },
+            "data_description": {
+              "export_rate_ex": "€/kWh, kaal (geen energiebelasting, geen btw). Alleen zonder saldering.",
+              "export_rate_low_ex": "€/kWh. Leeg = gelijk aan normaal.",
+              "export_costs_ex": "€/kWh, gaat af van elke teruggeleverde kWh. Alleen zonder saldering.",
+              "export_costs_year": "Alleen informatief (bijv. een staffel); niet in de kWh-prijs."
+            }
+          }
+        }
       }
     },
     "error": {
       "no_providers": "Kies minstens één bron.",
       "weighting_needs_accuracy": "Automatische weging vereist dat nauwkeurigheidsmeting aan staat.",
       "cannot_connect": "Deze bron is niet bereikbaar.",
-      "invalid_api_key": "De API-key is afgewezen."
+      "invalid_api_key": "De API-key is afgewezen.",
+      "duplicate_start": "Er bestaat al een periode met deze ingangsdatum.",
+      "gap_before_first": "De vroegste periode moet vandaag of eerder beginnen (geen gat vóór de eerste periode).",
+      "last_period": "De laatste periode kan niet worden verwijderd.",
+      "missing_fields": "Verplichte waarden ontbreken: {missing}. Vul ze in, of markeer de periode als voorlopig.",
+      "invalid_period": "Deze waarden vormen geen geldige periode."
+    }
+  },
+  "issues": {
+    "period_incomplete": {
+      "title": "Tariefperiode {start} is voorlopig of onvolledig",
+      "description": "De DynTarNL-tariefperiode vanaf {start} geldt nu of binnen 14 dagen, maar staat als voorlopig ({provisional}) of mist waarden: {missing}.\n\nTijdslots zonder waarde krijgen geen prijs (onbekend), nooit 0. Controleer de waarden (bijv. het definitieve Belastingplan en de nieuwe voorwaarden van je leverancier) via Instellingen → Apparaten en diensten → DynTarNL → Configureren → Tariefperiodes, en zet \"voorlopig\" uit."
+    },
+    "export_below_minimum": {
+      "title": "Terugleververgoeding onder het wettelijk minimum ({start})",
+      "description": "In de tariefperiode vanaf {start} is de ingestelde terugleververgoeding lager dan 50% van het kale leveringstarief. Van 2027 tot en met 2029 moeten leveranciers minimaal dat betalen. Controleer de waarde met je contract."
+    },
+    "legacy_export_entities": {
+      "title": "Oude teruglever-entiteiten worden in DynTarNL 2.0 vervangen",
+      "description": "Deze DynTarNL-entiteiten worden in een automatisering of script gebruikt:\n{entities}\n\nIn 1.x blijven ze ongewijzigd werken. Ze tonen de dynamische terugleververgoeding (beurs − opslag) en kennen geen saldering, terugleverkosten of contracttypes. De verkoop-entiteiten (sell_*) en de verkooptabel wel; die vervangen ze in 2.0. Zet je automatiseringen en scripts om naar de entiteit achter de pijl."
     }
   }
 }

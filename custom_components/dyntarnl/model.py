@@ -25,6 +25,17 @@ class Slot:
     tax_ex: float = 0.0    # energiebelasting, excl. btw
     vat: float = 0.0       # btw-deel van de totale prijs
     has_breakdown: bool = True  # False = alleen all-in bekend (bijv. EnergyZero)
+    # Leveringsdeel excl. btw (vast contract: het kale contracttarief). None = beurs + opslag.
+    energy_ex: float | None = None
+    # Verkoop: terugleverkosten per kWh (excl. btw), afgetrokken van de vergoeding.
+    costs_ex: float = 0.0
+
+    @property
+    def energy_part_ex(self) -> float | None:
+        """Leveringsdeel excl. btw: contracttarief, of beurs + opslag."""
+        if self.energy_ex is not None:
+            return self.energy_ex
+        return None if self.market_ex is None else self.market_ex + self.fee_ex
 
 
 @dataclass(slots=True)

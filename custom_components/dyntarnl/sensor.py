@@ -11,17 +11,21 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import CURRENCY_EURO, UnitOfTime
+from homeassistant.const import CURRENCY_EURO, EntityCategory, UnitOfTime
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from homeassistant.util import dt as dt_util
 
-from .const import ELECTRICITY, GAS
-from .coordinator import DynTarNLConfigEntry
+from .const import DOMAIN, ELECTRICITY, GAS, NAME
+from .coordinator import DynTarNLConfigEntry, DynTarNLCoordinator
 from .entity import DynTarNLEntity
 from .model import EnergyData, Slot
 from .prices import feed_in_value, feed_in_value_ex, slot_at as _slot_at
+from .tables import row_at, table
+from .tariffs import period_at, period_summary
 
 type PriceFn = Callable[[Slot], float]
 type ValueFn = Callable[[EnergyData, datetime, PriceFn], float | None]
@@ -292,6 +296,116 @@ class DynTarNLFeedInSensor(DynTarNLEntity, SensorEntity):
         return description.attr_fn(data, dt_util.now(), description.attr_price)
 
 
+class DynTarNLSellSensor(DynTarNLPriceSensor):
+    """Verkoop (teruglevering): dezelfde metrieken als inkoop, op de verkoopprijs."""
+
+    @property
+    def _data(self) -> EnergyData | None:
+        return self.coordinator.sell_data()
+
+
+class DynTarNLSpreadSensor(DynTarNLEntity, SensorEntity):
+    """Inkoop − verkoop voor het huidige slot (0 zolang saldering geldt)."""
+
+    _attr_name = "spread now"
+    _attr_icon = "mdi:arrow-expand-vertical"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 5
+    _attr_native_unit_of_measurement = f"{CURRENCY_EURO}/kWh"
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, ELECTRICITY)
+        self._attr_unique_id = f"{coordinator.config_entry.entry_id}_electricity_spread_current"
+
+    @property
+    def native_value(self) -> float | None:
+        row = row_at(self.coordinator.rows(ELECTRICITY)[0], dt_util.now())
+        if row is None or row.buy is None or row.sell is None:
+            return None
+        return round(row.buy.total - row.sell.total, PRICE_PRECISION)
+
+
+class DynTarNLTableSensor(DynTarNLEntity, SensorEntity):
+    """De volledige inkoop- of verkooptabel (compact kolomformaat); state = prijs van nu.
+
+    Gepubliceerd én (met voorspellingen aan) voorspeld, per slot met bron en opbouw. De
+    tabel gaat niet de recorder in.
+    """
+
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 5
+    _unrecorded_attributes = frozenset({"rows", "sources", "fields", "start", "start_local"})
+
+    def __init__(self, coordinator, energy: str, side: str) -> None:
+        super().__init__(coordinator, energy)
+        self._side = side
+        self._attr_name = f"{side} table"
+        self._attr_icon = "mdi:table-arrow-down" if side == "buy" else "mdi:table-arrow-up"
+        self._attr_unique_id = f"{coordinator.config_entry.entry_id}_{energy}_{side}_table"
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        fc = self.coordinator.forecast
+        if fc is not None and self._energy == ELECTRICITY:
+            # Nieuwe voorspelling = nieuwe tabel, ook zonder nieuwe gepubliceerde prijzen.
+            self.async_on_remove(fc.async_add_listener(self.async_write_ha_state))
+
+    @property
+    def native_unit_of_measurement(self) -> str:
+        unit = self._data.unit if self._data else ("m³" if self._energy == GAS else "kWh")
+        return f"{CURRENCY_EURO}/{unit}"
+
+    @property
+    def native_value(self) -> float | None:
+        row = row_at(self.coordinator.rows(self._energy)[0], dt_util.now())
+        slot = None if row is None else (row.buy if self._side == "buy" else row.sell)
+        return None if slot is None else round(slot.total, PRICE_PRECISION)
+
+    @property
+    def extra_state_attributes(self) -> dict | None:
+        rows, step = self.coordinator.rows(self._energy)
+        if not rows:
+            return None
+        unit = self._data.unit if self._data else "kWh"
+        supplier = self.coordinator.supplier.name if self.coordinator.supplier else ""
+        return table(rows, step, self._side, unit, supplier)
+
+
+class DynTarNLTariffPeriodSensor(CoordinatorEntity[DynTarNLCoordinator], SensorEntity):
+    """Diagnostiek: welke tariefperiode nu geldt en welke eraan komt."""
+
+    _attr_has_entity_name = True
+    _attr_name = "tariff period"
+    _attr_icon = "mdi:calendar-range"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator)
+        entry_id = coordinator.config_entry.entry_id
+        self._attr_unique_id = f"{entry_id}_tariff_period"
+        supplier = coordinator.supplier
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_service")},
+            name=NAME,
+            manufacturer=supplier.name if supplier else NAME,
+            model="Dynamic tariffs",
+            entry_type=DeviceEntryType.SERVICE,
+        )
+
+    @property
+    def available(self) -> bool:
+        return True
+
+    @property
+    def native_value(self) -> str | None:
+        current = period_at(self.coordinator.periods, dt_util.now())
+        return None if current is None else current.start.isoformat()
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return period_summary(self.coordinator.periods, dt_util.now(), self.coordinator.custom)
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: DynTarNLConfigEntry,
@@ -311,6 +425,19 @@ async def async_setup_entry(
             DynTarNLComponentSensor(coordinator, energy, d) for d in _COMPONENT_SENSORS
         )
     entities.extend(DynTarNLFeedInSensor(coordinator, d) for d in _FEEDIN_SENSORS)
+    # Verkoop: dezelfde metrieken als inkoop (zonder de grote reeks-attributen; die staan in
+    # de tabel), plus spread, de tabellen en de diagnostiek van de tariefperiode.
+    for key, label, icon, value_fn, _attr_fn in _METRICS:
+        description = DynTarNLSensorDescription(
+            key=f"sell_{key}", name=f"sell {label}", icon=icon, value_fn=value_fn
+        )
+        entities.append(DynTarNLSellSensor(coordinator, ELECTRICITY, "sell", lambda s: s.total, description))
+    entities.append(DynTarNLSpreadSensor(coordinator))
+    entities.extend(
+        DynTarNLTableSensor(coordinator, energy, side)
+        for energy, side in ((ELECTRICITY, "buy"), (ELECTRICITY, "sell"), (GAS, "buy"))
+    )
+    entities.append(DynTarNLTariffPeriodSensor(coordinator))
     if coordinator.forecast is not None:
         # Alleen als de voorspel-optie aan staat; anders exact de oude set.
         from .forecast.sensor import forecast_entities

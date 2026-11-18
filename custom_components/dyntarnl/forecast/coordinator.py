@@ -212,7 +212,11 @@ class DynTarNLForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
                 settled = self.tracker.settle(all_slots(prices.get(ELECTRICITY)), now)
             else:
                 settled = 0
-            data, combined = build(prices, self.series, self.tracker, self.cfg, self.supplier_name, now)
+            data, combined = build(
+                prices, self.series, self.tracker, self.cfg, self.supplier_name, now,
+                periods=getattr(self.prices, "periods", ()),
+                custom=getattr(self.prices, "custom", False),
+            )
             if self.tracker is not None and snapshot and combined:
                 self.tracker.add_snapshot(
                     # Looptijd vanaf de oudste bijdragende reeks (niet 'nu'): draagt een bron

@@ -25,3 +25,10 @@ get_prices:
           min: 1
           max: 168
           unit_of_measurement: h
+    format:
+      default: records
+      selector:
+        select:
+          options:
+            - records
+            - table

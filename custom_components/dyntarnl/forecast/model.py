@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 
 from homeassistant.util import dt as dt_util
 
+from ..model import Slot
 from ..const import (
     CONF_FC_ACCURACY,
     CONF_FC_BIAS,
@@ -92,6 +93,13 @@ class QuarterRecord:
     spread_max: float | None = None
     expected_error_raw: float | None = None
     expected_error_allin: float | None = None
+    # Volledige opbouw voor de inkoop- en verkooptabel (None = geen prijs te bepalen).
+    buy: Slot | None = None
+    sell: Slot | None = None
+
+    @property
+    def price_sell(self) -> float | None:
+        return None if self.sell is None else self.sell.total
 
     def as_dict(self) -> dict:
         """Voor de service-respons: tijden in lokale ISO-notatie."""
@@ -104,6 +112,7 @@ class QuarterRecord:
             "end": dt_util.as_local(self.end).isoformat(),
             "price_raw": r(self.price_raw),
             "price_allin": r(self.price_allin),
+            "price_sell": r(self.price_sell),
             "source": self.source,
             "expanded": self.expanded,
         }

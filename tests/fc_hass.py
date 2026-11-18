@@ -93,6 +93,8 @@ class Hass:
         self.services = Services()
         self.entity_registry = EntityRegistry(registry_entries)
         self.device_registry = DeviceRegistry(devices)
+        self.state = "not_running"  # zoals HA tijdens het opstarten
+        self.bus = type("Bus", (), {"async_listen_once": lambda _s, event, cb: (lambda: None)})()
 
 
 @dataclass
