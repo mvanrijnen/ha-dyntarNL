@@ -98,3 +98,17 @@ async def test_migration_from_1_2_adds_tariff_periods(hass, prices):
     starts = [p["start"] for p in entry.options["tariff_periods"]]
     assert starts == ["2026-01-01", "2027-01-01"]
     assert entry.options["tariff_periods"][1]["provisional"] is True
+
+
+async def test_legacy_check_after_start_runs_in_the_event_loop(hass, prices, caplog):
+    """Bij een HA-start laadt DynTarNL vóór 'homeassistant_started'; de controle daarna
+    gaf 'calls issue_registry.async_delete from a thread other than the event loop'."""
+    from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
+    from homeassistant.core import CoreState
+
+    hass.set_state(CoreState.starting)
+    await _add_custom(hass)
+    hass.bus.async_fire(EVENT_HOMEASSISTANT_STARTED)
+    await hass.async_block_till_done()
+    assert "thread other than the event loop" not in caplog.text
+    assert "Error" not in caplog.text or "dyntarnl" not in caplog.text

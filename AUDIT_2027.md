@@ -1,6 +1,7 @@
 # Audit: DynTarNL en het einde van salderen (1 januari 2027)
 
-Status: **fase 1, alleen gelezen, niets gewijzigd.** Codestand: `main` na v1.2.1.
+Status: **uitgevoerd in 1.3.0** (tariefperiodes, inkoop-/verkooptabel, vast/variabel, repairs;
+zie [docs/tarieven.md](docs/tarieven.md)). Hieronder de oorspronkelijke audit op `main` na v1.2.1.
 
 ## Samenvatting
 

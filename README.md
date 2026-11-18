@@ -22,6 +22,12 @@ middelt ze gewogen en corrigeert ze (met de tarieven van jouw leverancier en hun
 nauwkeurigheid). Handig om laden, de thuisaccu of de wasmachine verder vooruit te plannen dan
 de day-ahead prijzen reiken. Standaard uit.
 
+**Klaar voor 2027 (einde salderen):** vanaf 1.3 rekent DynTarNL met
+[tariefperiodes](docs/tarieven.md) per ingangsdatum (dynamisch, vast of variabel contract,
+saldering aan/uit, terugleverkosten) en publiceert het een **inkoop- én verkooptabel** per
+tijdslot in hetzelfde formaat. Elk tijdslot krijgt de regels van zijn eigen periode, ook in
+voorspellingen over de jaargrens. In te stellen via de UI.
+
 > ## Stabiel — klaar voor dagelijks gebruik
 >
 > De integratie draait in productie en de entiteiten liggen vast: vanaf 1.0 verandert er niets
@@ -91,7 +97,25 @@ Bijv. `sensor.dyntarnl_e_all_in_now`, `sensor.dyntarnl_g_market_today_avg`.
 | `sensor.dyntarnl_X_tax_incl_vat` / `_tax_excl_vat` | Energiebelasting per eenheid |
 | `sensor.dyntarnl_X_markup_incl_vat` / `_markup_excl_vat` | Opslag (markup) van de leverancier |
 
+### Inkoop- en verkooptabel, verkoop-sensoren (vanaf 1.3)
+
+Volledige uitleg, kolommen en voorbeeld-JSON: **[docs/tarieven.md](docs/tarieven.md)**.
+
+| entity_id | Waarde |
+| --- | --- |
+| `sensor.dyntarnl_e_buy_table` / `..._e_sell_table` / `..._g_buy_table` | De inkoop- en verkooptabel per tijdslot (gisteren t/m het eind van wat bekend is, incl. voorspellingen), compact: `fields` + `rows`, met per slot bron en opbouw. State = prijs nu |
+| `sensor.dyntarnl_e_sell_now` / `_sell_prev` / `_sell_next` | Verkoopprijs (teruglevering) nu, vorig en volgend slot. T/m 2026 (saldering) gelijk aan de inkoopprijs |
+| `sensor.dyntarnl_e_sell_today_min` / `_avg` / `_max`, `_sell_tomorrow_min` / `_max` | Zoals bij inkoop |
+| `sensor.dyntarnl_e_spread_now` | Inkoop − verkoop nu |
+| `binary_sensor.dyntarnl_e_sell_negative_now` | Terugleveren kost nu geld (verkoop < 0); `next_start`/`next_end` = eerstvolgende periode |
+| `sensor.dyntarnl_e_sell_best_block_start` | Beste blok om terug te leveren (alleen met voorspellingen aan) |
+| `sensor.dyntarnl_tariff_period` | Diagnostiek: huidige en volgende tariefperiode, voorlopige of ontbrekende waarden |
+
 ### Export-sensoren (teruglevering, alleen stroom = `e`)
+
+Deze tonen de dynamische *vergoeding* (beurs − opslag) en kennen geen saldering,
+terugleverkosten of contracttype. Ze blijven in 1.x ongewijzigd werken; gebruik voor nieuwe
+automatiseringen de verkoop-entiteiten hierboven (in 2.0 vervallen deze).
 
 | entity_id | Waarde |
 | --- | --- |
@@ -707,6 +731,16 @@ Als custom repository: HACS → ⋮ → **Custom repositories** →
 Of handmatig: kopieer `custom_components/dyntarnl/` naar je Home Assistant
 `config/custom_components/` en herstart.
 </details>
+
+### Tariefperiodes (vanaf 1.3)
+
+*Configureren → Tariefperiodes*: per ingangsdatum contracttype (dynamisch, vast, variabel),
+saldering, energiebelasting, btw, en per periode een sectie **Inkoop** en **Verkoop**. Bij het
+bijwerken naar 1.3 maakt DynTarNL je huidige periode aan plus een **voorlopige periode vanaf
+1-1-2027** (saldering uit, energiebelasting 2027 uit het Belastingplan). Vul daar de
+terugleverkosten van je leverancier in en zet "voorlopig" uit zodra alles definitief is; tot
+die tijd krijg je 14 dagen vooraf een melding onder *Reparaties*. Zie
+[docs/tarieven.md](docs/tarieven.md).
 
 ### Leverancier of tarieven wijzigen
 

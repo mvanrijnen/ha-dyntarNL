@@ -253,13 +253,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: DynTarNLConfigEntry) -> 
     # Tariefperiodes: voorlopig/onvolledig of onder het wettelijk minimum → repair-melding.
     async_update_issues(hass, coordinator.periods, coordinator.custom)
     # Oude teruglever-entiteiten in gebruik? Pas na de start (automatiseringen geladen).
-    entry.async_on_unload(
-        hass.bus.async_listen_once(
-            "homeassistant_started", lambda _e: async_check_legacy_usage(hass, entry.entry_id)
-        )
-    )
-    if hass.state is CoreState.running:
+    # @callback: anders voert HA de listener in een andere thread uit (issue-register = loop).
+    @callback
+    def _check_legacy(_event=None) -> None:
         async_check_legacy_usage(hass, entry.entry_id)
+
+    entry.async_on_unload(hass.bus.async_listen_once("homeassistant_started", _check_legacy))
+    if hass.state is CoreState.running:
+        _check_legacy()
 
     @callback
     def _fetch(_now=None) -> None:

@@ -14,7 +14,7 @@ Everything the user sees (README, `strings.json`) plus most code comments/docstr
 ## Commands
 
 ```bash
-pytest                 # full suite (~160 tests, no HA install, no network)
+pytest                 # full suite (~250 tests, no HA install, no network)
 pytest tests/test_sources.py::test_frank_parser -q            # single test
 pytest -k gasday
 ```
@@ -68,6 +68,17 @@ Data flows: **supplier registry → platform fetcher → shared `Slot` model →
 - `model.py` — `Slot` (one hour: `total`/`market`/`fee`/`tax`, each with an `_ex` excl.-VAT
   twin) and `bucket_by_day()`, which splits a flat slot list into yesterday/today/tomorrow by
   *local* date. `PriceData = dict[str, EnergyData]` keyed by `ELECTRICITY`/`GAS`.
+- `tariffs.py` — tariff periods (`Period`, stored in `entry.options["tariff_periods"]`): contract
+  type (dynamic/fixed/variable), netting, tax, VAT, markups, export fee/costs, off-peak times.
+  `period_at(periods, slot.start)` picks the rules **per slot** (local date), never per "now".
+  `buy_slot`/`contract_slot`/`sell_slot` price one slot; `PriceResolver` does the same per
+  forecast quarter (inside the period of the last published hour it uses that hour's tariff →
+  bit-for-bit the old behaviour). Missing values give `None`, never 0.
+- `tables.py` — `build_rows` builds buy+sell per slot on one fixed resolution (published wins
+  over forecast; fixed contracts fill tomorrow without publication); `table()` renders the
+  compact `fields`/`rows` format used by the table entities and `get_prices format: table`.
+- `issues.py` — repair issues: provisional/incomplete period within 14 days, export fee below the
+  2027–2029 legal minimum, legacy `export_*` entities used in automations.
 - `coordinator.py` — dispatches on `supplier.platform`, then calls `fetch_epex()` **only** when
   `_needs_epex_fallback()` finds slots without a market price. `update_interval=None`.
 - `entity.py` / `sensor.py` / `binary_sensor.py` / `button.py` — entities are generated from
@@ -77,8 +88,9 @@ Data flows: **supplier registry → platform fetcher → shared `Slot` model →
 - `__init__.py` — owns *when* data is fetched (see below), registers the `dyntarnl.refresh`
   and `dyntarnl.get_prices` services, and migrates config entries (1.1 → 1.2).
 - `config_flow.py` — supplier choice (+ `reconfigure`/`reconfigure_custom` to switch supplier or
-  edit Custom tariffs on the same entry, so entities/history survive) plus an options flow that
-  only holds the forecast options.
+  edit Custom tariffs on the same entry, so entities/history survive; Custom tariffs go into the
+  current tariff period) plus an options flow: a menu with the forecast steps and the tariff
+  periods (add/edit/delete, sections "buy"/"sell"). Config entry minor 1.3 = tariff periods.
 - `forecast/` — optional EPEX forecasts (off by default; `CONF_FORECAST`). Electricity only,
   per quarter hour, internally UTC:
   - `providers/` — one `ForecastProvider` subclass per source, registered in `PROVIDERS`. A new
@@ -119,6 +131,14 @@ Data flows: **supplier registry → platform fetcher → shared `Slot` model →
   coordinator's `data`, and a forecast failure must never propagate into the price path.
   Forecast unique IDs contain `_forecast_`; setup removes the ones the current options don't
   produce.
+
+- **Tariff periods are the single source of truth** for everything that changes per start date.
+  API suppliers on a dynamic contract keep their published slots untouched; Custom and
+  fixed/variable contracts are priced from the period of each slot (`price_with_periods`).
+  Legacy `export_*` entities keep the old `feed_in_value` meaning (market − markup); the
+  `sell_*` entities and the sell table are the 2027-correct path.
+- **Never subtract two local datetimes**: with the same tzinfo Python subtracts wall clocks (the
+  doubled October hour becomes 0 min). Convert to UTC or use timestamps.
 
 ### Adding a new supplier
 

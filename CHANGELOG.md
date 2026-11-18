@@ -3,6 +3,40 @@
 Alle noemenswaardige wijzigingen. Versies volgen [semver](https://semver.org/lang/nl/);
 oudere versies staan op de [releases-pagina](https://github.com/mvanrijnen/ha-dyntarNL/releases).
 
+## 1.3.0
+
+Voorbereid op het einde van salderen (1 januari 2027). Er breekt niets: alle bestaande
+entiteiten en attributen blijven hetzelfde, en tot en met 2026 veranderen je prijzen niet.
+
+### Nieuw: tariefperiodes (via de UI)
+
+- *Configureren → Tariefperiodes*: periodes met een ingangsdatum (00:00 Europe/Amsterdam),
+  contracttype **dynamisch, vast of variabel**, saldering aan/uit, energiebelasting, btw, en
+  per periode een sectie *Inkoop* en *Verkoop* (opslag/korting teruglevering,
+  terugleverkosten). Vast/variabel met enkel- of dubbeltarief, daltijden, weekend en
+  optioneel feestdagen; tarieven als all-in of kaal in te voeren.
+- **Elk tijdslot krijgt de regels van zijn eigen periode**, ook in voorspellingen over de
+  jaargrens. Een ontbrekende waarde geeft geen prijs (onbekend), nooit een stille 0.
+- Bij het bijwerken: je huidige periode plus een **voorlopige periode vanaf 1-1-2027**
+  (saldering uit, energiebelasting uit het Belastingplan 2027; opslag en terugleverkosten leeg).
+- Meldingen onder *Reparaties*: een periode die binnen 14 dagen ingaat en nog voorlopig of
+  onvolledig is; een vaste terugleververgoeding onder het wettelijk minimum (2027–2029); oude
+  teruglever-entiteiten die nog in een automatisering worden gebruikt.
+
+### Nieuw: inkoop- en verkooptabel
+
+- `sensor.dyntarnl_e_buy_table`, `sensor.dyntarnl_e_sell_table`, `sensor.dyntarnl_g_buy_table`:
+  per tijdslot prijs, kale beurs, opbouw (levering, opslag, terugleverkosten, belasting, btw),
+  spread en bron (gepubliceerd/voorspeld/contract), in een compact kolomformaat. Inkoop en
+  verkoop hebben dezelfde slots en dezelfde kolommen.
+- Verkoop-sensoren `sell_now/prev/next`, `sell_today_min/avg/max`, `sell_tomorrow_min/max`,
+  `spread_now`, `binary_sensor.dyntarnl_e_sell_negative_now` (met de eerstvolgende periode),
+  `sell_best_block_start` (met voorspellingen) en de diagnostische `sensor.dyntarnl_tariff_period`.
+- `dyntarnl.get_prices` met `format: table` geeft de twee tabellen; de records hebben nu ook
+  `price_sell`.
+
+Documentatie: [docs/tarieven.md](docs/tarieven.md).
+
 ## 1.2.1
 
 Alleen documentatie: de grafiekkaart en de Markdown-tabel in `docs/voorspellingen.md` tonen

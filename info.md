@@ -17,6 +17,11 @@ De terugleverprijs (beurs − opslag) staat ook als reeks in de attributen van
 `sensor.dyntarnl_e_export_price_now` (gepubliceerd) en, met voorspellingen aan, als
 `forecast_export` op `sensor.dyntarnl_e_all_in_forecast_avg`.
 
+## Klaar voor 2027 (vanaf 1.3)
+Tariefperiodes per ingangsdatum (dynamisch, vast of variabel contract, saldering aan/uit,
+terugleverkosten), in te stellen via de UI, en een inkoop- én verkooptabel per tijdslot.
+Elk tijdslot rekent met de regels van zijn eigen periode, ook over de jaargrens.
+
 ## Optioneel: prijsvoorspellingen (vanaf 1.1)
 Standaard uit. Aan te zetten via *Configureren*. DynTarNL voorspelt zelf niets: het leest
 EPEX-voorspellingen (standaard 72 uur, instelbaar tot 7 dagen) uit bij externe voorspellers (EpexPredictor, Energy
